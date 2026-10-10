@@ -1,0 +1,209 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-optima: var(--font-optima);
+  --font-montserrat: var(--font-montserrat);
+  --font-outfit: var(--font-outfit);
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #bd9951 transparent;
+  }
+
+  h2 {
+    @apply text-[26px] md:text-[26px] lg:text-[30px] 2xl:text-[39px] leading-tight;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(189, 153, 81, 0.3);
+    border-radius: 20px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(189, 153, 81, 0.6);
+  }
+}
+
+:root {
+  background-color: #f9f9f9;
+  overflow-x: hidden;
+}
+
+/* Fallback styling for blog content if prose plugin misses something */
+@layer components {
+  .prose {
+    @apply text-gray-800;
+  }
+
+  .prose h1 {
+    @apply text-3xl font-bold mb-6 mt-8 text-gray-900 leading-tight;
+  }
+
+  .prose h2 {
+    @apply text-2xl font-bold mb-4 mt-8 text-gray-900 leading-tight;
+  }
+
+  .prose h3 {
+    @apply text-xl font-bold mb-3 mt-6 text-gray-900 leading-tight;
+  }
+
+  .prose p {
+    @apply mb-4 leading-relaxed;
+  }
+
+  .prose ul {
+    @apply list-disc list-outside ml-6 mb-6 mt-2 space-y-1;
+  }
+
+  /* Tiptap Task List Fixes */
+  .prose ul[data-type="taskList"] {
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .prose ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    /* Align checkbox with top of text */
+    gap: 0.5rem;
+    padding-left: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose ul[data-type="taskList"] li > label {
+    margin-top: 0.25rem;
+    /* Align checkbox visually with text cap-height */
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-right: 0;
+    user-select: none;
+  }
+
+  .prose ul[data-type="taskList"] li > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Key fix: Remove built-in prose margins from p tags inside task lists */
+  .prose ul[data-type="taskList"] li p {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .prose ol {
+    @apply list-decimal list-outside ml-6 mb-6 mt-2 space-y-1;
+  }
+
+  .prose li {
+    @apply pl-1;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-gray-300 pl-4 py-1 italic my-6 text-gray-700 bg-gray-50 rounded-r;
+  }
+
+  .prose a {
+    @apply text-blue-600 underline hover:text-blue-800 transition-colors;
+  }
+
+  .prose strong {
+    @apply font-bold text-gray-900;
+  }
+
+  .prose img {
+    @apply rounded-lg my-6 shadow-sm max-w-full h-auto;
+  }
+
+  .prose code {
+    @apply bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  .prose table {
+    @apply w-full border-collapse my-6 text-left;
+  }
+
+  .prose th {
+    @apply bg-gray-100 border border-gray-300 px-4 py-2 font-bold;
+  }
+
+  .prose td {
+    @apply border border-gray-300 px-4 py-2;
+  }
+}
+
+  .policy-content, .policy-account-content {
+    font-family: var(--font-montserrat), sans-serif !important;
+  }
+
+  .policy-content h1, .policy-account-content h1 {
+    font-family: var(--font-optima), serif !important;
+    @apply text-2xl font-bold mb-4 mt-8 text-[#6a3f07] leading-tight;
+  }
+
+  .policy-content h2, .policy-account-content h2 {
+    font-family: var(--font-optima), serif !important;
+    @apply text-xl font-bold mb-3 mt-6 text-[#6a3f07] leading-tight;
+  }
+
+  .policy-content h3, .policy-account-content h3 {
+    font-family: var(--font-optima), serif !important;
+    @apply text-lg font-bold mb-2 mt-4 text-[#6a3f07] leading-tight;
+  }
+
+  .policy-content a, .policy-account-content a {
+    @apply text-[#bd9951] underline hover:text-[#6a3f07] transition-colors;
+  }
+
+  .policy-content blockquote, .policy-account-content blockquote {
+    @apply border-l-4 border-[#bd9951] pl-4 py-1 italic my-6 text-gray-700 bg-gray-50 rounded-r;
+  }
+
+@layer utilities {
+  .animate-slide-left {
+    animation: slide-left 0.35s ease forwards;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.35s ease forwards;
+  }
+  .animate-slide-out-right {
+    animation: slide-out-right 0.35s ease forwards;
+  }
+}
+
+@keyframes slide-left {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
