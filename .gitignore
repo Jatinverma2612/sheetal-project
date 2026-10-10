@@ -1,0 +1,32 @@
+# Dependencies
+**/node_modules/
+**/.pnp
+.pnp.*
+
+# Build outputs and caches
+**/.next/
+**/build/
+**/dist/
+**/out/
+**/.cache/
+
+# Logs
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and secrets
+**/.env
+**/.env*.local
+**/serviceAccountKey.json
+**/*.pem
+!**/.env.example
+
+# Backups and workspace metadata
+**/.git_backup/
+.agents/
+logs/
+*.zip
+.DS_Store
+Thumbs.db
