@@ -1,0 +1,631 @@
+diff --git a/client/src/components/admin/cms/lookbook/LookbookForm.js b/client/src/components/admin/cms/lookbook/LookbookForm.js
+index 8f2fcac..d441662 100644
+--- a/client/src/components/admin/cms/lookbook/LookbookForm.js
++++ b/client/src/components/admin/cms/lookbook/LookbookForm.js
+@@ -8,11 +8,14 @@ import {
+   Info,
+   Type,
+   Link,
++  Tag,
++  ChevronDown,
+ } from "lucide-react";
+ import toast from "react-hot-toast";
+ import axios from "axios";
+ import { API_BASE_URL } from "@/services/api";
+-import TiptapEditor from "@/components/TiptapEditor"; // adjust path as needed
++import TiptapEditor from "@/components/TiptapEditor";
++import { fetchAllCategories } from "@/services/categoryService";
+ 
+ const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+ const ACCEPTED_EXTENSIONS = ".jpg,.jpeg,.png";
+@@ -24,55 +27,69 @@ const DEFAULT_CENTER = {
+     "<p>Upgrade your everyday style with beautifully crafted pieces that blend comfort, elegance, and effortless charm.</p>",
+   buttonText: "VIEW MORE",
+   buttonLink: "",
++  categoryLink: "",
+ };
+ 
+ export default function LookbookForm() {
+-  const [leftSliderImages, setLeftSliderImages] = useState([]);
+-  const [rightSliderImages, setRightSliderImages] = useState([]);
++  const [sliderImages, setSliderImages] = useState([]);
+   const [centerContent, setCenterContent] = useState(DEFAULT_CENTER);
+   const [isSaving, setIsSaving] = useState(false);
+   const [isLoading, setIsLoading] = useState(true);
++  const [categories, setCategories] = useState([]);
+ 
+   const SLUG = "timeless-women";
+ 
++  // Load lookbook data + categories in parallel
+   useEffect(() => {
+-    const fetchLookbook = async () => {
++    const load = async () => {
+       try {
+-        const { data } = await axios.get(`${API_BASE_URL}/lookbooks/${SLUG}`, {
+-          withCredentials: true,
+-        });
+-        if (data.success && data.lookbook) {
+-          setLeftSliderImages(data.lookbook.leftSliderImages || []);
+-          setRightSliderImages(data.lookbook.rightSliderImages || []);
+-          if (data.lookbook.centerContent) {
+-            setCenterContent({
+-              ...DEFAULT_CENTER,
+-              ...data.lookbook.centerContent,
+-            });
++        const [lookbookRes, catRes] = await Promise.all([
++          axios.get(`${API_BASE_URL}/lookbooks/${SLUG}`, {
++            withCredentials: true,
++          }),
++          fetchAllCategories(),
++        ]);
++
++        // Categories — API returns { success, data: [...] }
++        if (catRes && catRes.data) {
++          setCategories(catRes.data);
++        }
++
++        // Lookbook data
++        const lb = lookbookRes.data?.lookbook;
++        if (lb) {
++          // Prefer unified sliderImages; fall back to leftSliderImages for migration
++          const imgs =
++            lb.sliderImages?.length > 0
++              ? lb.sliderImages
++              : lb.leftSliderImages || [];
++          setSliderImages(imgs);
++
++          if (lb.centerContent) {
++            setCenterContent({ ...DEFAULT_CENTER, ...lb.centerContent });
+           }
+         }
+       } catch (error) {
+-        console.error("Error fetching lookbook:", error);
++        console.error("Error fetching lookbook data:", error);
+       } finally {
+         setIsLoading(false);
+       }
+     };
+-    fetchLookbook();
++    load();
+   }, []);
+ 
+-  const validateImage = (file) => {
+-    return new Promise((resolve, reject) => {
++  // ─── Image helpers ─────────────────────────────────────────────────────────
++
++  const validateImage = (file) =>
++    new Promise((resolve, reject) => {
+       if (!ACCEPTED_TYPES.includes(file.type)) {
+-        reject(
+-          `"${file.name}" is not a valid type. Only JPG and PNG are allowed.`,
+-        );
+-        return;
++        reject(`"${file.name}" is not valid. Only JPG and PNG are allowed.`);
++      } else {
++        resolve();
+       }
+-      resolve();
+     });
+-  };
+ 
+-  const handleImageUpload = async (e, setImages) => {
++  const handleImageUpload = async (e) => {
+     const newFiles = Array.from(e.target.files);
+     if (!newFiles.length) return;
+ 
+@@ -90,43 +107,60 @@ export default function LookbookForm() {
+       }),
+     );
+ 
+-    if (errors.length)
+-      errors.forEach((err) => toast.error(err, { duration: 4000 }));
++    if (errors.length) errors.forEach((err) => toast.error(err, { duration: 4000 }));
+ 
+     if (valid.length) {
+-      const newImages = valid.map((file) => ({
++      const newImgs = valid.map((file) => ({
+         url: URL.createObjectURL(file),
+         file,
+         isNew: true,
++        categoryLink: "",
+       }));
+-      setImages((prev) => [...prev, ...newImages]);
++      setSliderImages((prev) => [...prev, ...newImgs]);
+       toast.success(`${valid.length} image(s) added`);
+     }
+ 
+     e.target.value = "";
+   };
+ 
+-  const removeImage = (index, setImages) => {
+-    setImages((prev) => prev.filter((_, i) => i !== index));
++  const removeImage = (index) => {
++    setSliderImages((prev) => prev.filter((_, i) => i !== index));
++  };
++
++  const updateImageCategory = (index, categorySlug) => {
++    setSliderImages((prev) =>
++      prev.map((img, i) =>
++        i === index ? { ...img, categoryLink: categorySlug } : img,
++      ),
++    );
+   };
+ 
++  // ─── Center content ─────────────────────────────────────────────────────────
++
+   const handleCenterChange = (field, value) => {
+     setCenterContent((prev) => ({ ...prev, [field]: value }));
+   };
+ 
++  // ─── Save ───────────────────────────────────────────────────────────────────
++
+   const handleSave = async () => {
+     setIsSaving(true);
+     const formData = new FormData();
+ 
+-    const existingLeft = leftSliderImages.filter((img) => !img.isNew);
+-    const newLeft = leftSliderImages.filter((img) => img.isNew);
+-    const existingRight = rightSliderImages.filter((img) => !img.isNew);
+-    const newRight = rightSliderImages.filter((img) => img.isNew);
++    const existingImgs = sliderImages.filter((img) => !img.isNew);
++    const newImgs = sliderImages.filter((img) => img.isNew);
++
++    // Send existing images (with their categoryLinks already embedded)
++    formData.append("existingSliderImages", JSON.stringify(existingImgs));
++
++    // Send new image files (binary) — multer can't carry metadata alongside files,
++    // so we send their categoryLinks separately as ordered JSON
++    newImgs.forEach((img) => formData.append("sliderImages", img.file));
++    formData.append(
++      "newSliderImagesMeta",
++      JSON.stringify(newImgs.map((img) => ({ categoryLink: img.categoryLink || "" }))),
++    );
+ 
+-    formData.append("existingLeftImages", JSON.stringify(existingLeft));
+-    formData.append("existingRightImages", JSON.stringify(existingRight));
+-    newLeft.forEach((img) => formData.append("leftImages", img.file));
+-    newRight.forEach((img) => formData.append("rightImages", img.file));
+     formData.append("title", "Timeless Women Collection");
+     formData.append("centerContent", JSON.stringify(centerContent));
+ 
+@@ -142,13 +176,14 @@ export default function LookbookForm() {
+ 
+       if (data.success) {
+         toast.success("Lookbook updated successfully!");
+-        setLeftSliderImages(data.lookbook.leftSliderImages);
+-        setRightSliderImages(data.lookbook.rightSliderImages);
+-        if (data.lookbook.centerContent) {
+-          setCenterContent(data.lookbook.centerContent);
+-        }
++        const lb = data.lookbook;
++        const imgs =
++          lb.sliderImages?.length > 0
++            ? lb.sliderImages
++            : lb.leftSliderImages || [];
++        setSliderImages(imgs);
++        if (lb.centerContent) setCenterContent(lb.centerContent);
+       }
+-      console.log(data.lookbook)
+     } catch (error) {
+       console.error("Error saving lookbook:", error);
+       toast.error(error.response?.data?.message || "Failed to update lookbook");
+@@ -177,34 +212,28 @@ export default function LookbookForm() {
+           <p className="text-[11px] text-amber-700 mt-0.5">
+             All images must be exactly{" "}
+             <span className="font-bold">650 × 500 px</span> and in{" "}
+-            <span className="font-bold">JPG or PNG</span> format.
++            <span className="font-bold">JPG or PNG</span> format. The same
++            images are displayed in <span className="font-bold">both</span>{" "}
++            sliders. Assign a category link to each image so clicking it takes
++            users to that category page.
+           </p>
+         </div>
+       </div>
+ 
+-      {/* Left Slider */}
+-      <ImageSection
+-        title="Left Slider Images"
+-        description="Manage images for the left-side carousel in the lookbook."
+-        images={leftSliderImages}
+-        setImages={setLeftSliderImages}
+-        onUpload={(e) => handleImageUpload(e, setLeftSliderImages)}
+-        onRemove={(index) => removeImage(index, setLeftSliderImages)}
+-        color="blue"
++      {/* Shared Slider Images */}
++      <SharedImageSection
++        images={sliderImages}
++        onUpload={handleImageUpload}
++        onRemove={removeImage}
++        onCategoryChange={updateImageCategory}
++        categories={categories}
+       />
+ 
+       {/* Center Content */}
+-      <CenterSection content={centerContent} onChange={handleCenterChange} />
+-
+-      {/* Right Slider */}
+-      <ImageSection
+-        title="Right Slider Images"
+-        description="Manage images for the right-side carousel in the lookbook."
+-        images={rightSliderImages}
+-        setImages={setRightSliderImages}
+-        onUpload={(e) => handleImageUpload(e, setRightSliderImages)}
+-        onRemove={(index) => removeImage(index, setRightSliderImages)}
+-        color="purple"
++      <CenterSection
++        content={centerContent}
++        onChange={handleCenterChange}
++        categories={categories}
+       />
+ 
+       {/* Save */}
+@@ -231,9 +260,152 @@ export default function LookbookForm() {
+   );
+ }
+ 
+-// ─── Center Content Section ───────────────────────────────────────────────────
++// ─── Category Dropdown ─────────────────────────────────────────────────────────
++
++function CategorySelect({ value, onChange, categories, placeholder = "No link — select category" }) {
++  return (
++    <div className="relative">
++      <Tag
++        size={12}
++        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
++      />
++      <ChevronDown
++        size={12}
++        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
++      />
++      <select
++        value={value || ""}
++        onChange={(e) => onChange(e.target.value)}
++        className="w-full appearance-none pl-7 pr-7 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition cursor-pointer"
++      >
++        <option value="">{placeholder}</option>
++        {categories.map((cat) => (
++          <option key={cat._id} value={cat.slug}>
++            {cat.name}
++          </option>
++        ))}
++      </select>
++    </div>
++  );
++}
++
++// ─── Shared Image Section ──────────────────────────────────────────────────────
++
++function SharedImageSection({
++  images,
++  onUpload,
++  onRemove,
++  onCategoryChange,
++  categories,
++}) {
++  return (
++    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
++      {/* Header */}
++      <div className="flex justify-between items-start mb-4">
++        <div>
++          <h3 className="text-sm font-black text-slate-900 uppercase">
++            Slider Images
++          </h3>
++          <p className="text-[10px] text-slate-500 mt-0.5">
++            These images appear in <span className="font-bold text-indigo-600">both</span> the left and right carousels.
++            Assign a category to each so clicking the image navigates the user there.
++          </p>
++          <div className="flex items-center gap-2 mt-2">
++            <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
++              📐 650 × 500 px
++            </span>
++            <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
++              🖼 JPG · PNG
++            </span>
++            <span className="inline-flex items-center gap-1 bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
++              🔗 Shared in both sliders
++            </span>
++          </div>
++        </div>
++        <label className="group flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md active:scale-95">
++          <PlusSquare size={16} className="text-white/80 group-hover:text-white" />
++          <span>Add Images</span>
++          <input
++            type="file"
++            multiple
++            accept={ACCEPTED_EXTENSIONS}
++            className="hidden"
++            onChange={onUpload}
++          />
++        </label>
++      </div>
++
++      {/* Image Grid */}
++      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
++        {images.map((img, i) => (
++          <div
++            key={i}
++            className="rounded-2xl overflow-visible bg-white border-2 border-indigo-400 relative shadow-sm transition-all animate-in zoom-in-95 duration-200 group"
++          >
++            {/* Image */}
++            <div className="aspect-[2/3] overflow-hidden rounded-t-xl">
++              <img
++                src={img.url}
++                alt={`Slide ${i + 1}`}
++                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
++              />
++            </div>
++
++            {/* NEW badge */}
++            {img.isNew && (
++              <div className="absolute top-2 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase shadow-sm bg-indigo-500 z-10">
++                New
++              </div>
++            )}
++
++            {/* Delete */}
++            <button
++              type="button"
++              onClick={() => onRemove(i)}
++              className="absolute top-2 right-2 bg-white/90 backdrop-blur text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-500 hover:text-white z-10"
++            >
++              <Trash2 size={14} />
++            </button>
++
++            {/* Category link dropdown */}
++            <div className="p-2 border-t border-slate-100 bg-slate-50 rounded-b-xl">
++              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
++                Links to
++              </p>
++              <CategorySelect
++                value={img.categoryLink}
++                onChange={(slug) => onCategoryChange(i, slug)}
++                categories={categories}
++                placeholder="No link"
++              />
++              {img.categoryLink && (
++                <p className="text-[8px] text-indigo-500 font-semibold mt-1 truncate">
++                  → /{img.categoryLink}
++                </p>
++              )}
++            </div>
++          </div>
++        ))}
++
++        {images.length === 0 && (
++          <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
++            <Images size={40} strokeWidth={1} />
++            <p className="text-[10px] font-bold mt-2 uppercase tracking-widest text-slate-400">
++              No images added
++            </p>
++            <p className="text-[9px] text-slate-300 mt-1">
++              650 × 500 px · JPG or PNG
++            </p>
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
++
++// ─── Center Content Section ────────────────────────────────────────────────────
+ 
+-function CenterSection({ content, onChange }) {
++function CenterSection({ content, onChange, categories }) {
+   return (
+     <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+       {/* Header */}
+@@ -246,7 +418,7 @@ function CenterSection({ content, onChange }) {
+             Center Content
+           </h3>
+           <p className="text-[10px] text-slate-500 mt-0.5">
+-            Edit the text displayed in the middle panel of the lookbook.
++            Edit the text and link for the middle banner panel.
+           </p>
+         </div>
+       </div>
+@@ -280,7 +452,7 @@ function CenterSection({ content, onChange }) {
+           />
+         </div>
+ 
+-        {/* Description — Tiptap */}
++        {/* Description */}
+         <div>
+           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+             Description
+@@ -293,24 +465,43 @@ function CenterSection({ content, onChange }) {
+           </div>
+         </div>
+ 
+-        {/* Link  */}
++        {/* Button Text */}
+         <div>
+           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+-            Link the Banner to
++            Button Text
+           </label>
+-          <div className="relative">
+-            <Link
+-              size={13}
+-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+-            />
+-            <input
+-              type="url"
+-              value={content.buttonLink}
+-              onChange={(e) => onChange("buttonLink", e.target.value)}
+-              placeholder="https://..."
+-              className="w-full pl-8 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition placeholder:text-slate-300"
+-            />
+-          </div>
++          <input
++            type="text"
++            value={content.buttonText || ""}
++            onChange={(e) => onChange("buttonText", e.target.value)}
++            placeholder="e.g. VIEW MORE"
++            className="w-full text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition placeholder:text-slate-300"
++          />
++        </div>
++
++        {/* Category Link for Banner */}
++        <div>
++          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
++            Link Banner &amp; Button to Category
++          </label>
++          <CategorySelect
++            value={content.categoryLink}
++            onChange={(slug) => {
++              onChange("categoryLink", slug);
++              // Also update buttonLink to /{slug} for backwards compat
++              onChange("buttonLink", slug ? `/${slug}` : "");
++            }}
++            categories={categories}
++            placeholder="No link — select a category"
++          />
++          {content.categoryLink && (
++            <p className="text-[10px] text-emerald-600 font-semibold mt-1.5">
++              → /{content.categoryLink}
++            </p>
++          )}
++          <p className="text-[9px] text-slate-400 mt-1">
++            Clicking the banner image or the button will navigate users to this category page.
++          </p>
+         </div>
+ 
+         {/* Live Preview */}
+@@ -318,9 +509,8 @@ function CenterSection({ content, onChange }) {
+           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+             Preview
+           </label>
+-
+           <a
+-            href={content.buttonLink || "#"}
++            href={content.buttonLink || content.categoryLink ? `/${content.categoryLink}` : "#"}
+             className="bg-[#faf9f7] border border-slate-200 rounded-2xl px-6 py-8 flex flex-col items-center text-center gap-3 hover:shadow-md transition cursor-pointer"
+           >
+             {content.label && (
+@@ -328,118 +518,28 @@ function CenterSection({ content, onChange }) {
+                 {content.label}
+               </p>
+             )}
+-
+             {content.heading && (
+               <h2 className="text-xl font-serif font-bold text-slate-800 leading-snug max-w-xs">
+                 {content.heading}
+               </h2>
+             )}
+-
+             {content.description && (
+               <div
+                 className="text-xs text-slate-500 max-w-xs leading-relaxed"
+                 dangerouslySetInnerHTML={{ __html: content.description }}
+               />
+             )}
++            {(content.buttonText || content.categoryLink) && (
++              <span className="mt-2 inline-flex items-center gap-1.5 bg-slate-900 text-white text-[10px] font-bold px-4 py-2 rounded-full tracking-wider">
++                {content.buttonText || "VIEW MORE"}
++                {content.categoryLink && (
++                  <Link size={10} className="opacity-70" />
++                )}
++              </span>
++            )}
+           </a>
+         </div>
+       </div>
+     </div>
+   );
+ }
+-
+-// ─── Image Section ─────────────────────────────────────────────────────────────
+-
+-function ImageSection({
+-  title,
+-  description,
+-  images,
+-  onUpload,
+-  onRemove,
+-  color,
+-}) {
+-  const borderColor = { blue: "border-blue-500", purple: "border-purple-500" };
+-  const btnColor =
+-    color === "blue"
+-      ? "bg-blue-600 hover:bg-blue-700"
+-      : "bg-purple-600 hover:bg-purple-700";
+-  const badgeColor = color === "blue" ? "bg-blue-500" : "bg-purple-500";
+-
+-  return (
+-    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+-      <div className="flex justify-between items-start mb-4">
+-        <div>
+-          <h3 className="text-sm font-black text-slate-900 uppercase">
+-            {title}
+-          </h3>
+-          <p className="text-[10px] text-slate-500 mt-0.5">{description}</p>
+-          <div className="flex items-center gap-2 mt-2">
+-            <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+-              📐 650 × 500 px
+-            </span>
+-            <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+-              🖼 JPG · PNG
+-            </span>
+-          </div>
+-        </div>
+-        <label
+-          className={`group flex items-center gap-2 ${btnColor} text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md active:scale-95`}
+-        >
+-          <PlusSquare
+-            size={16}
+-            className="text-white/80 group-hover:text-white"
+-          />
+-          <span>Add Images</span>
+-          <input
+-            type="file"
+-            multiple
+-            accept={ACCEPTED_EXTENSIONS}
+-            className="hidden"
+-            onChange={onUpload}
+-          />
+-        </label>
+-      </div>
+-
+-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+-        {images.map((img, i) => (
+-          <div
+-            key={i}
+-            className={`aspect-[2/3] rounded-2xl overflow-hidden bg-white border-2 relative group shadow-sm transition-all animate-in zoom-in-95 duration-200 ${borderColor[color]}`}
+-          >
+-            <img
+-              src={img.url}
+-              alt={`Upload ${i}`}
+-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+-            />
+-            {img.isNew && (
+-              <div
+-                className={`absolute top-2 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase shadow-sm ${badgeColor}`}
+-              >
+-                New
+-              </div>
+-            )}
+-            <button
+-              type="button"
+-              onClick={() => onRemove(i)}
+-              className="absolute top-2 right-2 bg-white/90 backdrop-blur text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-500 hover:text-white"
+-            >
+-              <Trash2 size={14} />
+-            </button>
+-          </div>
+-        ))}
+-
+-        {images.length === 0 && (
+-          <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+-            <Images size={40} strokeWidth={1} />
+-            <p className="text-[10px] font-bold mt-2 uppercase tracking-widest text-slate-400">
+-              No images added
+-            </p>
+-            <p className="text-[9px] text-slate-300 mt-1">
+-              650 × 500 px · JPG or PNG
+-            </p>
+-          </div>
+-        )}
+-      </div>
+-    </div>
+-  );
+-}

@@ -1,0 +1,104 @@
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import ErrorResponse from "../utils/ErrorResponse.js";
+import { getMulterStorageEngine } from "../storage/index.js";
+
+export const uploadTo = (folderName) => {
+  const isTemp = folderName.startsWith("temp");
+
+  let storage;
+
+  if (isTemp) {
+    // Local storage for temp files (e.g., Excel imports)
+    storage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        const uploadPath = `uploads/${folderName}`;
+        if (!fs.existsSync(uploadPath)) {
+          fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(
+          null,
+          `${folderName.replace(/\//g, "-")}-${uniqueSuffix}${path.extname(file.originalname)}`,
+        );
+      },
+    });
+  } else {
+    // Provider-aware storage for assets (Cloudinary / S3)
+    storage = getMulterStorageEngine(folderName);
+  }
+
+
+  const fileFilter = (req, file, cb) => {
+    // Basic filter - allow images, videos, and excel for specific routes
+    const allowedTypes = /jpeg|jpg|png|webp|mp4|webm|mov|xlsx|xls|csv/;
+    // You might want to be more specific based on folderName if needed
+    // For now, this generic check or the one below is fine.
+
+    // Check extension
+    const extname = path.extname(file.originalname).toLowerCase();
+
+    // For temp/excel, allow spreadsheet extensions only
+    if (folderName === "temp/excel") {
+      if ([".xlsx", ".xls", ".csv"].includes(extname)) {
+        return cb(null, true);
+      }
+      return cb(
+        ErrorResponse("Only Excel/CSV files are allowed for this route.", 400),
+        false,
+      );
+    }
+
+    // For temp/bulk, allow spreadsheet, images, and variant videos.
+    if (folderName === "temp/bulk") {
+      const isSpreadsheet = [".xlsx", ".xls", ".csv"].includes(extname);
+      const isImage =
+        /\.(jpeg|jpg|png|webp|gif|svg|heic)$/i.test(extname) &&
+        (/image/i.test(file.mimetype || "") ||
+          file.mimetype === "application/octet-stream" ||
+          !file.mimetype ||
+          extname === ".heic");
+      const isVideo =
+        /\.(mp4|webm|mov|mkv)$/i.test(extname) &&
+        (/video/i.test(file.mimetype || "") ||
+          file.mimetype === "application/octet-stream" ||
+          !file.mimetype);
+
+      if (isSpreadsheet || isImage || isVideo) {
+        return cb(null, true);
+      }
+      return cb(
+        ErrorResponse(
+          "Only Excel/CSV files, images, and videos are allowed for bulk import.",
+          400,
+        ),
+        false,
+      );
+    }
+
+    const isExtValid = /\.(jpeg|jpg|png|webp|gif|svg|avif|jfif|heic|heif|mp4|webm|mov|mkv)$/i.test(extname);
+    const isMimeValid =
+      /image|video/.test(file.mimetype || "") ||
+      file.mimetype === "image\/svg\+xml" ||
+      file.mimetype === "application\/octet-stream" ||
+      !file.mimetype;
+
+    if (isExtValid && isMimeValid) {
+      cb(null, true);
+    } else {
+      cb(ErrorResponse("Only images and videos are allowed.", 400), false);
+    }
+  };
+
+  return multer({
+    storage,
+    fileFilter,
+    limits: {
+      fileSize: folderName === "temp/bulk" ? 5 * 1024 * 1024 : 55 * 1024 * 1024,
+    },
+  });
+};

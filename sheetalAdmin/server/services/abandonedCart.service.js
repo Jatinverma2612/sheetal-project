@@ -1,0 +1,1079 @@
+import crypto from "crypto";
+import Cart from "../models/cart.model.js";
+import User from "../models/user.model.js";
+import Settings from "../models/settings.model.js";
+import ErrorResponse from "../utils/ErrorResponse.js";
+import logger from "../utils/logger.js";
+import { config } from "../config/config.js";
+import { buildAbandonedCartOrderUrl } from "../utils/abandonedCartLinks.js";
+import {
+  logReminderProviderResult,
+  sendReminderEmail,
+  sendReminderSms,
+  sendReminderWhatsApp,
+} from "./abandonedCart.notification.service.js";
+import {
+  cancelAbandonedCartCoupons,
+  issueAbandonedCartCoupon,
+} from "./abandonedcartcoupon.service.js";
+import { ensureAbandonedCartQueue } from "../queues/abandonedCart.queue.js";
+import {
+  REMINDER_STAGES,
+  REMINDER_STAGE_TO_RECOVERY_STEP,
+} from "../constants/abandonedCart.constants.js";
+
+export const claimReminderStageLease = async ({
+  cartId,
+  cycleId,
+  stage,
+  leaseDurationMs = 5 * 60 * 1000,
+}) => {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + leaseDurationMs);
+  const leaseToken = crypto.randomUUID();
+
+  const filter = {
+    _id: cartId,
+    abandonmentStatus: "abandoned",
+    abandonmentCycleId: cycleId,
+    $or: [
+      { abandonmentActiveLease: null },
+      { "abandonmentActiveLease.expiresAt": { $lt: now } },
+    ],
+    abandonmentReminderAttempts: {
+      $not: {
+        $elemMatch: {
+          cycleId,
+          stage,
+          status: { $in: ["success", "quarantined", "skipped"] },
+        },
+      },
+    },
+  };
+
+  const update = {
+    $set: {
+      abandonmentActiveLease: {
+        stage,
+        cycleId,
+        leaseToken,
+        claimedAt: now,
+        expiresAt,
+      },
+    },
+  };
+
+  const updatedCart = await Cart.findOneAndUpdate(filter, update, {
+    new: true,
+  });
+
+  return {
+    acquired: Boolean(updatedCart),
+    leaseToken: updatedCart ? leaseToken : null,
+    cart: updatedCart || null,
+  };
+};
+
+export const releaseReminderStageLease = async (cartId, leaseToken = null) => {
+  const filter = { _id: cartId };
+  if (leaseToken) {
+    filter["abandonmentActiveLease.leaseToken"] = leaseToken;
+  }
+  await Cart.findByIdAndUpdate(filter, {
+    $set: { abandonmentActiveLease: null },
+  });
+};
+
+const buildAbandonedCartJobId = (cartId, cycleId, stage) =>
+  `abandoned-cart-${cartId}-${cycleId}-${stage}`;
+
+const clamp = (value, min, max) =>
+  Math.min(max, Math.max(min, Number(value) || min));
+
+const normalizeContact = (value) => {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length ? trimmed : null;
+};
+
+export const buildCartTrackingId = (cart, updatedAt = new Date()) => {
+  const createdAt = cart?.createdAt
+    ? new Date(cart.createdAt)
+    : updatedAt instanceof Date
+      ? updatedAt
+      : new Date(updatedAt);
+  const lastUpdatedAt =
+    updatedAt instanceof Date ? updatedAt : new Date(updatedAt || Date.now());
+
+  return `cart-${createdAt.getTime()}-${lastUpdatedAt.getTime()}`;
+};
+
+const getCartTrackingId = (cart, updatedAt = new Date()) =>
+  cart?.cartTrackingId || buildCartTrackingId(cart, updatedAt);
+
+const getReminderPolicy = async () => {
+  const settings = await Settings.findOne().lean();
+
+  return {
+    inactivityMinutes: clamp(
+      settings?.abandonedCartInactivityMinutes ??
+        config.abandonedCart.inactivityMinutes,
+      1,
+      30,
+    ),
+    discountPercent: clamp(
+      settings?.abandonedCartDiscountPercent ??
+        config.abandonedCart.discountPercent,
+      5,
+      10,
+    ),
+    couponCode:
+      settings?.abandonedCartCouponCode || config.abandonedCart.couponCode,
+  };
+};
+
+const calculateCartValue = (items = []) =>
+  items.reduce((sum, item) => {
+    const price =
+      Number(item.discountPrice) > 0
+        ? Number(item.discountPrice)
+        : Number(item.price) || 0;
+    return sum + price * (Number(item.quantity) || 0);
+  }, 0);
+
+const buildItemSnapshot = (item) => {
+  const product = item.product || {};
+  const name = product.name || item.name || "Product";
+  const image =
+    item.variantImage ||
+    product.mainImage?.url ||
+    product.images?.[0] ||
+    item.image ||
+    "";
+
+  return {
+    productId: product._id || item.product || null,
+    name,
+    image,
+    variantImage: item.variantImage || null,
+    price: Number(item.price) || 0,
+    discountPrice: Number(item.discountPrice) || 0,
+    quantity: Number(item.quantity) || 1,
+    size: item.size || item.variant?.size || null,
+    color: item.color || item.variant?.color || null,
+    slug: product.slug || null,
+  };
+};
+
+const buildCartSnapshot = (cart) => {
+  const items = (cart.items || []).map(buildItemSnapshot);
+
+  return {
+    cartId: cart._id.toString(),
+    trackingId: getCartTrackingId(cart, cart.updatedAt),
+    userId: cart.user?._id?.toString?.() || cart.user?.toString?.() || null,
+    email: cart.email || cart.user?.email || null,
+    phoneNumber: cart.phoneNumber || cart.user?.phoneNumber || null,
+    items,
+    cartValue: calculateCartValue(items),
+    itemCount: items.length,
+    firstImage: items[0]?.image || null,
+    firstName: cart.user?.name || cart.email || "Customer",
+  };
+};
+
+const loadCartForAbandonment = async (cartId) =>
+  Cart.findById(cartId)
+    .populate("user", "name email phoneNumber alternativeMobileNumber")
+    .populate("items.product", "name mainImage images slug")
+    .lean();
+
+const loadCartDocument = async (cartId) =>
+  Cart.findById(cartId)
+    .populate("user", "name email phoneNumber alternativeMobileNumber")
+    .populate("items.product", "name mainImage images slug");
+
+const buildReminderData = (
+  cartSnapshot,
+  stage,
+  policy,
+  cycleId,
+  abandonedAt,
+  ctaUrl = null,
+) => ({
+  cartId: cartSnapshot.cartId,
+  cartTrackingId: cartSnapshot.trackingId,
+  userId: cartSnapshot.userId,
+  cycleId,
+  stage,
+  recoveryStage: REMINDER_STAGE_TO_RECOVERY_STEP[stage] || null,
+  abandonedAt,
+  snapshot: cartSnapshot,
+  discountPercent: policy.discountPercent,
+  couponCode: policy.couponCode,
+  ctaUrl,
+});
+
+const getCartContactUpdates = async (cart, overrides = {}) => {
+  let updatedEmail =
+    normalizeContact(overrides.email) || normalizeContact(cart.email);
+  let updatedPhone =
+    normalizeContact(overrides.phoneNumber) ||
+    normalizeContact(cart.phoneNumber);
+
+  if ((!updatedEmail || !updatedPhone) && cart.user) {
+    const userId = cart.user?._id || cart.user;
+    const user = await User.findById(userId).lean();
+    if (user) {
+      updatedEmail = updatedEmail || normalizeContact(user.email);
+      updatedPhone =
+        updatedPhone ||
+        normalizeContact(user.phoneNumber) ||
+        normalizeContact(user.alternativeMobileNumber);
+    }
+  }
+
+  return {
+    email: updatedEmail || null,
+    phoneNumber: updatedPhone || null,
+  };
+};
+
+const persistReminderAttempt = async (cartId, entry) => {
+  await Cart.findByIdAndUpdate(cartId, {
+    $push: { abandonmentReminderAttempts: entry },
+    $set: { abandonmentActiveLease: null },
+  });
+};
+
+const sanitizeReminderAttempts = (cart) => {
+  if (!Array.isArray(cart?.abandonmentReminderAttempts)) {
+    return [];
+  }
+
+  const validStatuses = new Set([
+    "success",
+    "failure",
+    "skipped",
+    "quarantined",
+    "claimed",
+  ]);
+
+  return cart.abandonmentReminderAttempts.filter(
+    (attempt) =>
+      attempt &&
+      typeof attempt.stage === "string" &&
+      attempt.stage.trim() &&
+      typeof attempt.jobId === "string" &&
+      attempt.jobId.trim() &&
+      typeof attempt.status === "string" &&
+      validStatuses.has(attempt.status),
+  );
+};
+
+const removeQueueJob = async () => {};
+
+const syncCartState = async (cart, updates) => {
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+  Object.assign(cart, updates);
+  await cart.save();
+  return cart;
+};
+
+const getStageChannels = (stage, cartSnapshot) => {
+  if (stage === "final") {
+    return cartSnapshot.email ? ["email"] : [];
+  }
+
+  const channels = [];
+  if (cartSnapshot.email) channels.push("email");
+  if (cartSnapshot.phoneNumber) channels.push("whatsapp");
+  if (stage === "third" && cartSnapshot.phoneNumber) channels.push("sms");
+  return channels;
+};
+
+const runChannelSend = async ({
+  channel,
+  cartSnapshot,
+  stage,
+  ctaUrl,
+  policy,
+}) => {
+  const cart = {
+    _id: cartSnapshot.cartId,
+    email: cartSnapshot.email,
+    phoneNumber: cartSnapshot.phoneNumber,
+    user: cartSnapshot.userId ? { name: cartSnapshot.firstName } : null,
+  };
+
+  const items = cartSnapshot.items;
+
+  switch (channel) {
+    case "email":
+      return sendReminderEmail({
+        cart,
+        items,
+        ctaUrl,
+        stage,
+        couponCode: policy.couponCode,
+        discountPercent: policy.discountPercent,
+      });
+    case "whatsapp":
+      return sendReminderWhatsApp({
+        cart,
+        items,
+        ctaUrl,
+        stage,
+        couponCode: policy.couponCode,
+        discountPercent: policy.discountPercent,
+      });
+    case "sms":
+      return sendReminderSms({
+        cart,
+        items,
+        ctaUrl,
+        stage,
+        couponCode: policy.couponCode,
+        discountPercent: policy.discountPercent,
+      });
+    default:
+      return { skipped: true, reason: "unsupported_channel" };
+  }
+};
+
+export const cancelReminders = async (cartIdOrDoc, options = {}) => {
+  const cart =
+    typeof cartIdOrDoc === "object" && cartIdOrDoc?._id
+      ? cartIdOrDoc
+      : await Cart.findById(cartIdOrDoc);
+
+  if (!cart) return null;
+
+  const cycleId = options.cycleId || cart.abandonmentCycleId;
+  if (!cycleId && !cart.abandonmentReminderJobIds) {
+    return cart;
+  }
+
+  const jobIds = [];
+  if (cart.abandonmentReminderJobIds) {
+    Object.values(cart.abandonmentReminderJobIds).forEach((value) => {
+      if (value) jobIds.push(value);
+    });
+  }
+
+  if (cycleId) {
+    REMINDER_STAGES.forEach(({ stage }) => {
+      const jobId = buildAbandonedCartJobId(
+        cart._id.toString(),
+        cycleId,
+        stage,
+      );
+      jobIds.push(jobId);
+    });
+
+    jobIds.push(buildAbandonedCartJobId(cart._id.toString(), cycleId, "mark"));
+  }
+
+  await Promise.all(jobIds.map((jobId) => removeQueueJob(jobId)));
+
+  // ── Cancel any active abandoned-cart coupons for this cart ───────────────
+  // When a cycle is cancelled (user became active again), the coupon issued
+  // for that cycle should no longer be usable.
+  try {
+    await cancelAbandonedCartCoupons(cart);
+  } catch (couponErr) {
+    logger.warn(
+      { cartId: cart._id.toString(), error: couponErr.message },
+      "[AbandonedCart] Failed to cancel abandoned-cart coupons on cycle cancel",
+    );
+  }
+
+  cart.abandonmentReminderJobIds = {};
+  cart.abandonmentActiveLease = null;
+  if (options.clearCycle !== false) {
+    cart.abandonmentCycleId = null;
+  }
+  if (options.clearStatus) {
+    cart.abandonmentStatus = options.clearStatus;
+  }
+
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+  await cart.save();
+  return cart;
+};
+
+export const scheduleReminders = async (
+  cartIdOrDoc,
+  { cycleId = null, abandonedAt = new Date(), snapshot = null } = {},
+) => {
+  const cart =
+    typeof cartIdOrDoc === "object" && cartIdOrDoc?._id
+      ? cartIdOrDoc
+      : await Cart.findById(cartIdOrDoc);
+
+  if (!cart) return null;
+
+  const activeCycleId = cycleId || cart.abandonmentCycleId;
+  if (!activeCycleId || cart.abandonmentStatus !== "abandoned") {
+    return cart;
+  }
+
+  cart.abandonmentReminderJobIds = {};
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+  await cart.save();
+
+  const policy = await getReminderPolicy();
+  const cartSnapshot =
+    snapshot || buildCartSnapshot(await loadCartForAbandonment(cart._id));
+  const queue = await ensureAbandonedCartQueue();
+  if (!queue) {
+    logger.warn(
+      {
+        cartId: cart._id.toString(),
+        cycleId: activeCycleId,
+      },
+      "[AbandonedCart] Redis unavailable; reminder scheduling handled by polling scheduler",
+    );
+    cart.abandonmentReminderJobIds = {};
+    await cart.save();
+    return cart;
+  }
+  const jobIds = {};
+
+  for (const reminder of REMINDER_STAGES) {
+    const availableChannels = getStageChannels(reminder.stage, cartSnapshot);
+
+    if (availableChannels.length === 0) {
+      continue;
+    }
+
+    const jobId = buildAbandonedCartJobId(
+      cart._id.toString(),
+      activeCycleId,
+      reminder.stage,
+    );
+
+    const delay = reminder.delayMinutes * 60 * 1000;
+
+    // ── Issue coupon when the third reminder is scheduled ─────────────────
+    // We issue it eagerly here (before the job fires) so the coupon record
+    // exists and the reminder CTA can carry the same abandoned-cart coupon
+    // code when the email/whatsapp/sms is sent.
+    if (reminder.stage === "third" && cartSnapshot.userId) {
+      try {
+        await issueAbandonedCartCoupon({
+          cartId: cartSnapshot.cartId,
+          userId: cartSnapshot.userId,
+          cycleId: activeCycleId,
+          discountPercent: policy.discountPercent,
+          items: cartSnapshot.items,
+        });
+      } catch (couponErr) {
+        // Non-fatal — reminder still sends, just without the coupon.
+        logger.warn(
+          {
+            cartId: cartSnapshot.cartId,
+            cycleId: activeCycleId,
+            error: couponErr.message,
+          },
+          "[AbandonedCart] Failed to issue abandoned-cart coupon for third reminder",
+        );
+      }
+    }
+
+    try {
+      await queue.add(
+        "send-reminder",
+        buildReminderData(
+          cartSnapshot,
+          reminder.stage,
+          policy,
+          activeCycleId,
+          abandonedAt,
+          buildAbandonedCartOrderUrl(cartSnapshot.cartId, {
+            source: reminder.stage === "third" ? "email" : undefined,
+            stage: REMINDER_STAGE_TO_RECOVERY_STEP[reminder.stage] || null,
+            cycleId: activeCycleId,
+            couponCode:
+              reminder.stage === "third" ? policy.couponCode : undefined,
+          }),
+        ),
+        {
+          jobId,
+          delay,
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      );
+
+      jobIds[reminder.stage] = jobId;
+    } catch (error) {
+      logger.error(
+        {
+          cartId: cart._id.toString(),
+          cycleId: activeCycleId,
+          stage: reminder.stage,
+          error: error.message,
+        },
+        "[AbandonedCart] Failed to schedule reminder job",
+      );
+    }
+  }
+
+  cart.abandonmentReminderJobIds = jobIds;
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+  await cart.save();
+  return cart;
+};
+
+export const markCartAsAbandoned = async (
+  cartIdOrDoc,
+  {
+    cycleId = null,
+    reason = "inactivity",
+    triggeredAt = new Date(),
+    checkoutExitedAt = null,
+  } = {},
+) => {
+  const cart =
+    typeof cartIdOrDoc === "object" && cartIdOrDoc?._id
+      ? cartIdOrDoc
+      : await loadCartDocument(cartIdOrDoc);
+
+  if (!cart) {
+    throw new ErrorResponse("Cart not found", 404);
+  }
+
+  if (cart.abandonmentStatus === "completed") {
+    return cart;
+  }
+
+  if (
+    cycleId &&
+    cart.abandonmentCycleId &&
+    cart.abandonmentCycleId !== cycleId
+  ) {
+    return cart;
+  }
+
+  if (!cart.items || cart.items.length === 0) {
+    return cart;
+  }
+
+  const finalCycleId =
+    cycleId || cart.abandonmentCycleId || crypto.randomUUID();
+  if (
+    cart.abandonmentStatus === "abandoned" &&
+    cart.abandonmentCycleId === finalCycleId &&
+    cart.abandonedAt
+  ) {
+    return cart;
+  }
+
+  const contact = await getCartContactUpdates(cart);
+  const trackingId = cart.items?.length
+    ? getCartTrackingId(cart, triggeredAt)
+    : null;
+
+  await syncCartState(cart, {
+    email: contact.email,
+    phoneNumber: contact.phoneNumber,
+    cartTrackingId: trackingId,
+    abandonmentStatus: "abandoned",
+    abandonedAt: triggeredAt,
+    checkoutExitedAt:
+      reason === "checkout_exit" ? checkoutExitedAt || triggeredAt : null,
+    completedAt: null,
+    abandonmentReason: reason,
+    abandonmentCycleId: finalCycleId,
+    lastActivityAt: cart.lastActivityAt || triggeredAt,
+  });
+
+  cart.abandonmentReminderJobIds = {};
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+
+  await scheduleReminders(cart, {
+    cycleId: finalCycleId,
+    abandonedAt: triggeredAt,
+    snapshot: buildCartSnapshot(cart),
+  });
+
+  logger.info(
+    {
+      cartId: cart._id.toString(),
+      cartTrackingId: cart.cartTrackingId || null,
+      userId: cart.user?._id?.toString?.() || cart.user?.toString?.() || null,
+      reason,
+      cycleId: finalCycleId,
+    },
+    "[AbandonedCart] Cart marked as abandoned",
+  );
+
+  return cart;
+};
+
+export const sendReminder = async ({
+  cartId,
+  cycleId,
+  stage,
+  jobId,
+  snapshot: snapshotFromJob = null,
+  ctaUrl: ctaUrlFromJob = null,
+  discountPercent: discountFromJob = null,
+  couponCode: couponFromJob = null,
+  abandonedAt = null,
+  leaseToken = null,
+}) => {
+  let activeLeaseToken = leaseToken;
+  let leaseCleared = false;
+
+  try {
+    const cart = await loadCartForAbandonment(cartId);
+    if (!cart) {
+      return { status: "skipped", reason: "cart_not_found" };
+    }
+
+    if (cart.abandonmentStatus === "completed") {
+      return { status: "skipped", reason: "cart_completed" };
+    }
+
+    if (
+      cart.abandonmentCycleId &&
+      cycleId &&
+      cart.abandonmentCycleId !== cycleId
+    ) {
+      return { status: "skipped", reason: "cycle_mismatch" };
+    }
+
+    const alreadyProcessed = cart.abandonmentReminderAttempts?.some(
+      (attempt) =>
+        attempt.jobId === jobId ||
+        (attempt.cycleId === cycleId &&
+          attempt.stage === stage &&
+          ["success", "quarantined", "skipped"].includes(attempt.status)),
+    );
+    if (alreadyProcessed) {
+      return { status: "skipped", reason: "duplicate_job" };
+    }
+
+    if (!activeLeaseToken && typeof Cart?.findOneAndUpdate === "function") {
+      try {
+        const leaseResult = await claimReminderStageLease({
+          cartId: cart._id,
+          cycleId,
+          stage,
+        });
+        if (!leaseResult.acquired) {
+          return { status: "skipped", reason: "lease_unavailable" };
+        }
+        activeLeaseToken = leaseResult.leaseToken;
+      } catch {
+        // Safe fallback in mock/isolated environments
+      }
+    }
+
+    const policy = await getReminderPolicy();
+    const cartSnapshot = snapshotFromJob || buildCartSnapshot(cart);
+    if (stage === "third" && cartSnapshot.userId) {
+      try {
+        await issueAbandonedCartCoupon({
+          cartId: cartSnapshot.cartId,
+          userId: cartSnapshot.userId,
+          cycleId,
+          discountPercent: policy.discountPercent,
+          items: cartSnapshot.items,
+        });
+      } catch (couponErr) {
+        logger.warn(
+          {
+            cartId: cartSnapshot.cartId,
+            cycleId,
+            error: couponErr.message,
+          },
+          "[AbandonedCart] Failed to issue abandoned-cart coupon for third reminder",
+        );
+      }
+    }
+    const ctaUrl =
+      ctaUrlFromJob || buildAbandonedCartOrderUrl(cartSnapshot.cartId);
+    const couponCode = couponFromJob || policy.couponCode;
+    const discountPercent = discountFromJob || policy.discountPercent;
+    const channels = getStageChannels(stage, cartSnapshot);
+
+    if (channels.length === 0) {
+      const skippedEntry = {
+        cycleId,
+        stage,
+        recoveryStage: REMINDER_STAGE_TO_RECOVERY_STEP[stage] || null,
+        jobId,
+        status: "skipped",
+        channels: [],
+        attemptedAt: new Date(),
+        completedAt: new Date(),
+        error: null,
+        metadata: {
+          reason: "no_available_channels",
+          cartTrackingId: cartSnapshot.trackingId,
+        },
+      };
+
+      await persistReminderAttempt(cart._id, skippedEntry);
+      leaseCleared = true;
+      return { status: "skipped", reason: "no_available_channels" };
+    }
+
+    const results = await Promise.allSettled(
+      channels.map((channel) =>
+        runChannelSend({
+          channel,
+          cartSnapshot,
+          stage,
+          ctaUrl,
+          policy: { couponCode, discountPercent },
+        }).then((result) => {
+          logReminderProviderResult(channel, result);
+          return { channel, result };
+        }),
+      ),
+    );
+
+    const channelStatuses = results.map((result, index) => {
+      const channel = channels[index];
+      if (result.status === "fulfilled") {
+        return { channel, ...result.value.result };
+      }
+      const err = result.reason;
+      return {
+        channel,
+        failed: true,
+        isAmbiguous: Boolean(err?.isAmbiguous),
+        error: err?.message || "Channel send failed",
+      };
+    });
+
+    const failures = channelStatuses.filter((entry) => entry.failed);
+    const successes = channelStatuses.filter(
+      (entry) => !entry.failed && !entry.skipped,
+    );
+    const skipped = channelStatuses.filter((entry) => entry.skipped);
+    const isAmbiguous = channelStatuses.some(
+      (entry) => entry.failed && entry.isAmbiguous,
+    );
+
+    const overallStatus = isAmbiguous
+      ? "quarantined"
+      : failures.length > 0
+        ? "failure"
+        : successes.length > 0
+          ? "success"
+          : "skipped";
+
+    const attemptEntry = {
+      cycleId,
+      stage,
+      recoveryStage: REMINDER_STAGE_TO_RECOVERY_STEP[stage] || null,
+      jobId,
+      status: overallStatus,
+      channels,
+      attemptedAt: new Date(),
+      completedAt: new Date(),
+      error: failures[0]?.error || null,
+      metadata: {
+        cartTrackingId: cartSnapshot.trackingId,
+        cartValue: cartSnapshot.cartValue,
+        itemCount: cartSnapshot.itemCount,
+        ctaUrl,
+        abandonedAt,
+        channels: channelStatuses,
+        skipped,
+      },
+    };
+
+    await persistReminderAttempt(cart._id, attemptEntry);
+    leaseCleared = true;
+
+    if (overallStatus === "quarantined") {
+      logger.warn(
+        {
+          cartId: cart._id.toString(),
+          cartTrackingId: cart.cartTrackingId || null,
+          cycleId,
+          stage,
+          jobId,
+          channels: channelStatuses,
+        },
+        "[AbandonedCart] Reminder dispatch ambiguous; stage quarantined to prevent duplicate sends",
+      );
+      return { status: "quarantined", channels: channelStatuses };
+    }
+
+    if (overallStatus === "failure") {
+      logger.error(
+        {
+          cartId: cart._id.toString(),
+          cartTrackingId: cart.cartTrackingId || null,
+          cycleId,
+          stage,
+          jobId,
+          channels: channelStatuses,
+        },
+        "[AbandonedCart] Reminder dispatch failed",
+      );
+      return { status: "failure", channels: channelStatuses };
+    }
+
+    logger.info(
+      {
+        cartId: cart._id.toString(),
+        cartTrackingId: cart.cartTrackingId || null,
+        cycleId,
+        stage,
+        jobId,
+        channels: channelStatuses,
+      },
+      "[AbandonedCart] Reminder dispatched",
+    );
+
+    return { status: "success", channels: channelStatuses };
+  } finally {
+    if (!leaseCleared && activeLeaseToken) {
+      await releaseReminderStageLease(cartId, activeLeaseToken).catch(() => {});
+    }
+  }
+};
+
+export const handleUserActivity = async ({
+  userId = null,
+  cartId = null,
+  email = null,
+  phoneNumber = null,
+  source = "cart",
+  checkoutExited = false,
+} = {}) => {
+  const filter = cartId ? { _id: cartId } : { user: userId };
+  const cart = await Cart.findOne(filter).populate(
+    "user",
+    "name email phoneNumber alternativeMobileNumber",
+  );
+
+  if (!cart) {
+    return null;
+  }
+
+  if (cart.abandonmentStatus === "completed") {
+    if (!cart.items?.length) {
+      return cart;
+    }
+
+    await syncCartState(cart, {
+      abandonmentStatus: "active",
+      abandonedAt: null,
+      checkoutExitedAt: null,
+      completedAt: null,
+      abandonmentReason: null,
+      abandonmentCycleId: null,
+      abandonmentReminderJobIds: {},
+      abandonmentActiveLease: null,
+      cartTrackingId: null,
+    });
+  }
+
+  const contact = await getCartContactUpdates(cart, {
+    email,
+    phoneNumber,
+  });
+
+  const previousCycleId = cart.abandonmentCycleId;
+  if (previousCycleId) {
+    await cancelReminders(cart, {
+      cycleId: previousCycleId,
+      clearCycle: false,
+    });
+  }
+
+  const nextCycleId = crypto.randomUUID();
+  const now = new Date();
+  const nextTrackingId = cart.items?.length
+    ? getCartTrackingId(cart, now)
+    : null;
+  const nextState = {
+    email: contact.email,
+    phoneNumber: contact.phoneNumber,
+    cartTrackingId: nextTrackingId,
+    lastActivityAt: now,
+    abandonmentStatus: "active",
+    abandonedAt: null,
+    checkoutExitedAt: checkoutExited ? now : null,
+    completedAt: null,
+    abandonmentReason: null,
+    abandonmentCycleId: cart.items?.length ? nextCycleId : null,
+    abandonmentReminderJobIds: {},
+    abandonmentActiveLease: null,
+  };
+
+  await syncCartState(cart, nextState);
+
+  if (!cart.items?.length) {
+    logger.info(
+      {
+        cartId: cart._id.toString(),
+        cartTrackingId: cart.cartTrackingId || null,
+        userId: cart.user?._id?.toString?.() || userId?.toString?.() || null,
+        source,
+        cycleId: cart.abandonmentCycleId,
+      },
+      "[AbandonedCart] Cart activity registered",
+    );
+    return cart;
+  }
+
+  const policy = await getReminderPolicy();
+  const queue = await ensureAbandonedCartQueue();
+  if (!queue) {
+    logger.warn(
+      {
+        cartId: cart._id.toString(),
+        cycleId: nextCycleId,
+        source,
+      },
+      "[AbandonedCart] Redis unavailable; abandonment timer skipped",
+    );
+    return cart;
+  }
+  const jobId = buildAbandonedCartJobId(
+    cart._id.toString(),
+    nextCycleId,
+    "mark",
+  );
+  try {
+    await queue.add(
+      "mark-abandoned",
+      {
+        cartId: cart._id.toString(),
+        userId: cart.user?._id?.toString?.() || userId?.toString?.() || null,
+        cycleId: nextCycleId,
+        inactivityMinutes: policy.inactivityMinutes,
+        source,
+      },
+      {
+        jobId,
+        delay: policy.inactivityMinutes * 60 * 1000,
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
+    );
+
+    cart.abandonmentReminderJobIds = {
+      mark: jobId,
+    };
+    await cart.save();
+  } catch (error) {
+    logger.error(
+      {
+        cartId: cart._id.toString(),
+        cycleId: nextCycleId,
+        error: error.message,
+      },
+      "[AbandonedCart] Failed to schedule abandonment timer",
+    );
+  }
+
+  logger.info(
+    {
+      cartId: cart._id.toString(),
+      cartTrackingId: cart.cartTrackingId || null,
+      userId: cart.user?._id?.toString?.() || userId?.toString?.() || null,
+      source,
+      cycleId: cart.abandonmentCycleId,
+    },
+    "[AbandonedCart] Cart activity registered",
+  );
+
+  return cart;
+};
+
+export const handleCheckoutExit = async ({
+  userId = null,
+  cartId = null,
+} = {}) => {
+  const filter = cartId ? { _id: cartId } : { user: userId };
+  const cart = await Cart.findOne(filter).populate(
+    "user",
+    "name email phoneNumber alternativeMobileNumber",
+  );
+
+  if (!cart) {
+    return null;
+  }
+
+  if (cart.abandonmentStatus === "completed") {
+    return cart;
+  }
+
+  const previousCycleId = cart.abandonmentCycleId;
+  if (previousCycleId) {
+    await cancelReminders(cart, {
+      cycleId: previousCycleId,
+      clearCycle: false,
+    });
+  }
+
+  const nextCycleId = crypto.randomUUID();
+  await markCartAsAbandoned(cart, {
+    cycleId: nextCycleId,
+    reason: "checkout_exit",
+    checkoutExitedAt: new Date(),
+  });
+
+  return cart;
+};
+
+export const completeAbandonedCartFlow = async ({
+  userId = null,
+  cartId = null,
+} = {}) => {
+  const filter = cartId ? { _id: cartId } : { user: userId };
+  const cart = await Cart.findOne(filter);
+
+  if (!cart) {
+    return null;
+  }
+
+  const cycleId = cart.abandonmentCycleId;
+  if (cycleId) {
+    await cancelReminders(cart, { cycleId, clearCycle: false });
+  }
+
+  const now = new Date();
+  cart.abandonmentStatus = "completed";
+  cart.completedAt = now;
+  cart.abandonedAt = null;
+  cart.checkoutExitedAt = null;
+  cart.abandonmentReason = "order_completed";
+  cart.abandonmentCycleId = null;
+  cart.abandonmentReminderJobIds = {};
+  cart.abandonmentActiveLease = null;
+  cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
+  cart.cartTrackingId = null;
+  await cart.save();
+
+  logger.info(
+    {
+      cartId: cart._id.toString(),
+      cartTrackingId: cart.cartTrackingId || null,
+      userId: cart.user?.toString?.() || userId?.toString?.() || null,
+    },
+    "[AbandonedCart] Flow completed and reminders cancelled",
+  );
+
+  return cart;
+};
+
+export const markCartAsAbandonedByJob = async (jobData = {}) =>
+  markCartAsAbandoned(jobData.cartId, {
+    cycleId: jobData.cycleId,
+    reason: "inactivity",
+    triggeredAt: new Date(),
+  });
+
+export const sendReminderByJob = async (jobData = {}) => sendReminder(jobData);
