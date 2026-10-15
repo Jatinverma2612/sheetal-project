@@ -6,7 +6,7 @@
     "dev": "next dev --webpack",
     "postinstall": "npx browserslist@latest --update-db",
     "dev:clean": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\" && next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "prettier": "prettier --write ."
@@ -35,12 +35,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "browserslist": "^4.29.3",
+    "caniuse-lite": "^1.0.30001816",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "caniuse-lite": "^1.0.30001573",
-    "browserslist": "^4.23.0",
-    "baseline-browser-mapping": "^13.0.0"
+    "typescript": "^5"
   }
 }
