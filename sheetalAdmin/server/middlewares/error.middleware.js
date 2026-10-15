@@ -44,6 +44,12 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 401;
   }
 
+  // Multer upload error (file too large, unexpected field, etc.)
+  if (err.name === "MulterError") {
+    statusCode = 400;
+    message = err.message || "File upload failed. Please verify file format and size.";
+  }
+
   // validation Error
   if (err.name === "ValidationError") {
     const friendlyFieldNames = {

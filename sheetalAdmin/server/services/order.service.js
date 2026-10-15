@@ -73,6 +73,18 @@ const getProductVariantForOrderItem = (product, item) => {
     return null;
   }
 
+  const requestedVariantId = String(
+    item?.variantId || item?.variant?._id || item?._id || "",
+  ).trim();
+
+  // 1. Exact match by Variant ID
+  if (requestedVariantId) {
+    const byId = product.variants.find(
+      (variant) => String(variant?._id || "").trim() === requestedVariantId,
+    );
+    if (byId) return byId;
+  }
+
   const requestedSku = String(item?.variant?.v_sku || "")
     .trim()
     .toUpperCase();
@@ -83,38 +95,61 @@ const getProductVariantForOrderItem = (product, item) => {
     .trim()
     .toLowerCase();
 
+  // 2. Exact match by variant v_sku (only if variant has a non-empty v_sku)
   if (requestedSku) {
-    const bySku = product.variants.find(
-      (variant) =>
-        String(variant?.v_sku || "")
-          .trim()
-          .toUpperCase() === requestedSku,
-    );
+    const bySku = product.variants.find((variant) => {
+      const vSku = String(variant?.v_sku || "").trim().toUpperCase();
+      return vSku && vSku === requestedSku;
+    });
     if (bySku) return bySku;
   }
 
+  // 3. Match by Color (support ObjectId string, populated colorId.name, or color.name)
   if (requestedColor) {
-    const byColor = product.variants.find(
-      (variant) =>
-        String(variant?.color?.name || "")
+    const byColor = product.variants.find((variant) => {
+      const colorName = String(variant?.color?.name || variant?.color || "")
+        .trim()
+        .toLowerCase();
+      if (colorName && colorName === requestedColor) return true;
+
+      if (variant?.colorId && typeof variant.colorId === "object") {
+        const cIdName = String(variant.colorId.name || "")
           .trim()
-          .toLowerCase() === requestedColor,
-    );
+          .toLowerCase();
+        if (cIdName && cIdName === requestedColor) return true;
+      }
+
+      const cIdStr = String(variant?.colorId?._id || variant?.colorId || "")
+        .trim()
+        .toLowerCase();
+      if (cIdStr && cIdStr === requestedColor) return true;
+
+      return false;
+    });
     if (byColor) return byColor;
   }
 
+  // 4. Fallback to size: Prefer variants that have positive stock for the requested size!
   if (requestedSize) {
-    const bySize = product.variants.find(
+    const inStockVariant = product.variants.find(
       (variant) =>
         Array.isArray(variant?.sizes) &&
-        variant.sizes.some(
-          (size) =>
-            String(size?.name || "")
-              .trim()
-              .toLowerCase() === requestedSize,
-        ),
+        variant.sizes.some((size) => {
+          const sName = String(size?.name || "").trim().toLowerCase();
+          return sName === requestedSize && Number(size?.stock) > 0;
+        }),
     );
-    if (bySize) return bySize;
+    if (inStockVariant) return inStockVariant;
+
+    const anySizeVariant = product.variants.find(
+      (variant) =>
+        Array.isArray(variant?.sizes) &&
+        variant.sizes.some((size) => {
+          const sName = String(size?.name || "").trim().toLowerCase();
+          return sName === requestedSize;
+        }),
+    );
+    if (anySizeVariant) return anySizeVariant;
   }
 
   return null;
@@ -174,7 +209,9 @@ export const validateInventoryForOrderItems = async (orderItems = []) => {
       throw ErrorResponse("Invalid order quantity", 400);
     }
 
-    const product = await Product.findById(item.product).lean();
+    const product = await Product.findById(item.product)
+      .populate("variants.colorId")
+      .lean();
     if (!product) {
       throw ErrorResponse(`Product not found: ${item.product}`, 404);
     }
@@ -196,28 +233,27 @@ export const applyOrderInventoryAdjustments = async (orderItems = []) => {
         throw ErrorResponse("Invalid order quantity", 400);
       }
 
-      const product = await Product.findById(item.product);
+      const product = await Product.findById(item.product).populate(
+        "variants.colorId",
+      );
       if (!product) {
         throw ErrorResponse(`Product not found: ${item.product}`, 404);
       }
 
       const availableStock = getAvailableStockForOrderItem(product, item);
-      if (
-        availableStock < quantity ||
-        (Number(product.stock) || 0) < quantity
-      ) {
-        throw buildInventoryError(
-          product,
-          item,
-          Math.min(availableStock, Number(product.stock) || 0),
-        );
-      }
-
       const variant = getProductVariantForOrderItem(product, item);
       const size = getVariantSizeForOrderItem(variant, item);
 
       if (variant && size) {
+        if (availableStock < quantity) {
+          throw buildInventoryError(product, item, availableStock);
+        }
         size.stock = Math.max(0, (Number(size.stock) || 0) - quantity);
+      } else {
+        const prodStock = Number(product.stock) || 0;
+        if (prodStock < quantity) {
+          throw buildInventoryError(product, item, prodStock);
+        }
       }
 
       product.stock = Math.max(0, (Number(product.stock) || 0) - quantity);
@@ -241,7 +277,9 @@ export const applyOrderInventoryAdjustments = async (orderItems = []) => {
 
 export const revertOrderInventoryAdjustments = async (orderItems = []) => {
   for (const item of orderItems) {
-    const product = await Product.findById(item.product);
+    const product = await Product.findById(item.product).populate(
+      "variants.colorId",
+    );
     if (!product) continue;
 
     const orderStats = normalizeOrderStats(product.orderStats);
@@ -629,7 +667,10 @@ export const getSingleOrderService = async (orderId, userId) => {
     .populate("user", "name email")
     .lean();
   if (!order) throw ErrorResponse("Order not found", 404);
-  if (order.user._id.toString() !== userId.toString()) {
+
+  const orderUserId =
+    order.user?._id?.toString() || order.user?.toString() || null;
+  if (orderUserId && orderUserId !== userId.toString()) {
     throw ErrorResponse("You are not authorised to view this order", 403);
   }
 
@@ -637,10 +678,19 @@ export const getSingleOrderService = async (orderId, userId) => {
   const userReviews = await Review.find({ user: userId }).select(
     "product rating comment createdAt",
   );
-  const reviewMap = new Map(userReviews.map((r) => [r.product.toString(), r]));
+  const reviewMap = new Map(
+    userReviews
+      .filter((r) => r.product)
+      .map((r) => [r.product.toString(), r]),
+  );
 
   order.orderItems.forEach((item) => {
-    const review = reviewMap.get(item.product.toString());
+    const prodId =
+      item.product && typeof item.product === "object"
+        ? item.product._id?.toString()
+        : item.product?.toString();
+
+    const review = prodId ? reviewMap.get(prodId) : null;
     item.isReviewed = !!review;
     if (review) {
       item.review = {
@@ -707,12 +757,16 @@ export const getAllOrdersService = async (queryStr, userId = null) => {
   if (userId) {
     const userReviews = await Review.find({ user: userId }).select("product");
     const reviewedProductIds = new Set(
-      userReviews.map((r) => r.product.toString()),
+      userReviews.filter((r) => r.product).map((r) => r.product.toString()),
     );
 
     orders.forEach((order) => {
       order.orderItems.forEach((item) => {
-        item.isReviewed = reviewedProductIds.has(item.product.toString());
+        const prodId =
+          item.product && typeof item.product === "object"
+            ? item.product._id?.toString()
+            : item.product?.toString();
+        item.isReviewed = prodId ? reviewedProductIds.has(prodId) : false;
       });
     });
   }

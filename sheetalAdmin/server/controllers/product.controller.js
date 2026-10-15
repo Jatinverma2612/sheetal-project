@@ -2,6 +2,7 @@ import * as productService from "../services/product.service.js";
 import successResponse from "../utils/successResponse.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 import { deleteFile, deleteS3File } from "../utils/fileHelper.js";
+import { deleteStorageAsset } from "../storage/index.js";
 import fs from "fs/promises";
 import SeoSettings from "../models/seosettings.model.js";
 import { generateProductSchema } from "../utils/schemaGenerator.js";
@@ -16,10 +17,10 @@ const clearFiles = async (files) => {
 
     await Promise.all(
       filesToClear.map(async (file) => {
-        if (file.key) {
-          await deleteS3File(file.key);
-        } else if (file.path) {
-          await deleteFile(file.path);
+        const identifier = file.public_id || file.key || file.filename;
+        const url = file.location || file.url || file.path;
+        if (identifier || url) {
+          await deleteStorageAsset(identifier, url);
         }
       }),
     );

@@ -24,6 +24,7 @@ import SeoParams from "./modal/SeoParams";
 import MediaParams from "./modal/MediaParams";
 import SimilarParams from "./modal/SimilarParams";
 import { sanitizeProductSlug } from "@/utils/productSlug";
+import { canonicalizeSizeName } from "@/utils/sizeUtils";
 
 export default function ProductModal({
   isOpen,
@@ -76,7 +77,7 @@ export default function ProductModal({
   });
 
   const getChartSizeLabel = (row) =>
-    String(row?.cells?.[0] || row?.label || "").trim();
+    canonicalizeSizeName(row?.cells?.[0] || row?.label || "");
 
   const getSeededSizesFromCategory = (category) => {
     if (category?.sizeMode === "free") {
@@ -121,15 +122,35 @@ export default function ProductModal({
     return [{ name: "", stock: 0, price: 0, discountPrice: 0 }];
   };
 
-  const createEmptyVariant = () => ({
-    v_sku: "",
-    colorId: "",
-    sizes: getDefaultVariantSizes(),
-    v_image: "",
-    videoFile: null,
-    v_video: "",
-    gallery: [],
-  });
+  const createEmptyVariant = (existingVariants = formData.variants) => {
+    let sizes = [];
+    if (
+      Array.isArray(existingVariants) &&
+      existingVariants.length > 0 &&
+      Array.isArray(existingVariants[0]?.sizes) &&
+      existingVariants[0].sizes.length > 0 &&
+      existingVariants[0].sizes.some((s) => String(s?.name || "").trim())
+    ) {
+      sizes = existingVariants[0].sizes.map((s) => ({
+        name: canonicalizeSizeName(s.name),
+        price: s.price !== undefined ? s.price : 0,
+        discountPrice: s.discountPrice !== undefined ? s.discountPrice : 0,
+        stock: 0,
+      }));
+    } else {
+      sizes = getDefaultVariantSizes();
+    }
+
+    return {
+      v_sku: "",
+      colorId: "",
+      sizes,
+      v_image: "",
+      videoFile: null,
+      v_video: "",
+      gallery: [],
+    };
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -220,12 +241,27 @@ export default function ProductModal({
     if (seededSizes.length === 0) return;
 
     setFormData((prev) => {
+      const hasVariant0Sizes =
+        Array.isArray(prev.variants) &&
+        prev.variants.length > 0 &&
+        Array.isArray(prev.variants[0]?.sizes) &&
+        prev.variants[0].sizes.some((s) => String(s?.name || "").trim());
+
+      const templateSizes = hasVariant0Sizes
+        ? prev.variants[0].sizes.map((s) => ({
+            name: canonicalizeSizeName(s.name),
+            price: s.price !== undefined ? s.price : 0,
+            discountPrice: s.discountPrice !== undefined ? s.discountPrice : 0,
+            stock: 0,
+          }))
+        : seededSizes;
+
       const nextVariants = Array.isArray(prev.variants)
-        ? prev.variants.map((variant) =>
+        ? prev.variants.map((variant, index) =>
             !Array.isArray(variant.sizes) ||
             variant.sizes.length === 0 ||
             variant.sizes.every((size) => !String(size?.name || "").trim())
-              ? { ...variant, sizes: seededSizes }
+              ? { ...variant, sizes: index === 0 ? seededSizes : templateSizes }
               : variant,
           )
         : [];
@@ -428,7 +464,7 @@ export default function ProductModal({
           toast.error(`Please enter a valid price for size "${s.name}".`);
           return;
         }
-        const normalizedSize = s.name.trim().toUpperCase();
+        const normalizedSize = canonicalizeSizeName(s.name);
         if (sizes.has(normalizedSize)) {
           setActiveTab("inventory");
           toast.error(
@@ -516,6 +552,16 @@ export default function ProductModal({
       });
 
         const cleanedVariants = formData.variants.map((v) => {
+        const cleanedSizes = Array.isArray(v.sizes)
+          ? v.sizes.map((s) => ({
+              ...s,
+              name: canonicalizeSizeName(s.name),
+              stock: Number(s.stock || 0),
+              price: Number(s.price || 0),
+              discountPrice: Number(s.discountPrice || 0),
+            }))
+          : [];
+
         const cleanedGallery = Array.isArray(v.gallery)
           ? v.gallery.slice(0, 6).map((item) => {
               if (item instanceof File) {
@@ -560,6 +606,7 @@ export default function ProductModal({
           const { color, ...rest } = v;
           return {
             ...rest,
+            sizes: cleanedSizes,
             hasNewImage: true,
             hasNewVideo,
             v_video: cleanedVideo,
@@ -569,6 +616,7 @@ export default function ProductModal({
         const { color, ...rest } = v;
         return {
           ...rest,
+          sizes: cleanedSizes,
           hasNewImage: false,
           hasNewVideo,
           v_video: cleanedVideo,
@@ -611,16 +659,26 @@ export default function ProductModal({
         ? await updateProduct(initialData._id, data)
         : await createProduct(data);
 
-      if (result.success) {
+      if (result?.success) {
         toast.success(
           result.message ||
             (initialData ? "Product updated 🎉" : "Product created 🚀"),
         );
         if (onSuccess) onSuccess();
         onClose();
+      } else {
+        toast.error(
+          result?.message ||
+            (initialData
+              ? "Failed to update product. Please review details."
+              : "Failed to create product. Please review details."),
+        );
       }
     } catch (error) {
-      console.error("Product Save Error:", error);
+      console.warn("Product Save Handled Error:", error.message);
+      if (error.message?.toLowerCase().includes("sku")) {
+        setActiveTab("basic");
+      }
       toast.error(error.message || "Failed to save product");
     } finally {
       setLoading(false);

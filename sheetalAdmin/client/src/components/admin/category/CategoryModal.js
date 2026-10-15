@@ -257,9 +257,9 @@ export default function CategoryModal({
   const handleFileChange = (e, fieldName) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
+      if (file.size > 10 * 1024 * 1024) {
         e.target.value = "";
-        return toast.error("Image is too large. Please upload a file smaller than 2MB.");
+        return toast.error("Image is too large. Please upload a file smaller than 10MB.");
       }
       (async () => {
         try {
@@ -343,10 +343,23 @@ export default function CategoryModal({
     data.append("canonicalUrl", formData.canonicalUrl);
     data.append("schema", schemaValidation.formatted || "");
 
-    if (formData.mainImage) data.append("mainImage", formData.mainImage);
-    if (formData.bannerImage) data.append("bannerImage", formData.bannerImage);
-    if (formData.ogImage) data.append("ogImage", formData.ogImage);
-    else if (typeof initialData?.ogImage === "string" && initialData.ogImage) {
+    if (formData.mainImage instanceof File) {
+      data.append("mainImage", formData.mainImage);
+    } else if (formData.mainImage && typeof formData.mainImage !== "string") {
+      data.append("mainImage", formData.mainImage);
+    }
+
+    if (formData.bannerImage instanceof File) {
+      data.append("bannerImage", formData.bannerImage);
+    } else if (formData.bannerImage && typeof formData.bannerImage !== "string") {
+      data.append("bannerImage", formData.bannerImage);
+    }
+
+    if (formData.ogImage instanceof File) {
+      data.append("ogImage", formData.ogImage);
+    } else if (typeof formData.ogImage === "string" && formData.ogImage) {
+      data.append("existingOgImage", formData.ogImage);
+    } else if (typeof initialData?.ogImage === "string" && initialData.ogImage) {
       data.append("existingOgImage", initialData.ogImage);
     }
 
@@ -361,7 +374,7 @@ export default function CategoryModal({
         onClose();
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save category. Please try again.");
+      toast.error(err.message || err.response?.data?.message || "Failed to save category. Please try again.");
     } finally {
       setLoading(false);
     }

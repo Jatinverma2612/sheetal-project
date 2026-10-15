@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, X, GripVertical } from "lucide-react";
 import { updateSizeChart } from "@/services/sizeChartService";
 import toast from "react-hot-toast";
+import { canonicalizeSizeName } from "@/utils/sizeUtils";
 import {
   DndContext,
   closestCenter,
@@ -268,6 +269,9 @@ export default function SizeChartEditModal({
     const cleanedRows = rows
       .map((row) => {
         const cells = row.cells.map((c) => String(c || "").trim());
+        if (cells[0]) {
+          cells[0] = canonicalizeSizeName(cells[0]);
+        }
         return {
           cells,
           ...toLegacyRow(cells),

@@ -3,6 +3,14 @@ import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 
+const ALLOWED_REASONS = [
+  "Wrong Size",
+  "Defective Product",
+  "Quality not as expected",
+  "Changed my mind",
+  "Wrong item sent",
+];
+
 // --- 1. REQUEST RETURN (User) ---
 export const requestReturnService = async (data, userId, files) => {
   const { orderId, productId, type, reason, details } = data;
@@ -14,20 +22,34 @@ export const requestReturnService = async (data, userId, files) => {
     throw new ErrorResponse("Sirf Delivered orders return ho sakte hain", 400);
   }
 
+  const targetProductId =
+    productId ||
+    order.orderItems?.[0]?.product?._id ||
+    order.orderItems?.[0]?.product;
+
+  if (!targetProductId) {
+    throw new ErrorResponse("Product not found for return", 400);
+  }
+
+  const returnType = type === "Exchange" ? "Exchange" : "Return";
+  const validatedReason = ALLOWED_REASONS.includes(reason)
+    ? reason
+    : "Quality not as expected";
+
   // Image paths array
   const images = files ? files.map((file) => ({ url: file.path })) : [];
 
   const returnRequest = await Return.create({
     order: orderId,
     user: userId,
-    product: productId,
-    type,
-    reason,
-    details,
+    product: targetProductId,
+    type: returnType,
+    reason: validatedReason,
+    details: details || "",
     images,
   });
 
-  // Order status ko bhi update kar sakte hain
+  // Order status ko update karo
   order.orderStatus = "Return Requested";
   await order.save();
 

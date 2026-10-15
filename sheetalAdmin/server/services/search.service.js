@@ -85,7 +85,10 @@ export const searchService = async ({ query, limit, page }) => {
     const matchedCategories = await findMatchingCategories(normQ);
     if (matchedCategories.length > 0) {
       for (const matchedCategory of matchedCategories) {
-        const categoryProducts = await getCategoryProducts(matchedCategory._id);
+        const categoryProducts = await getCategoryProducts(
+          matchedCategory._id,
+          matchedCategory.matchedSubCategories || [],
+        );
         categoryProducts.forEach((product) =>
           resolvedCategoryProductIds.add(product._id.toString()),
         );
@@ -123,7 +126,11 @@ export const searchService = async ({ query, limit, page }) => {
       return true;
     }
     if (hasResolvedCategory) {
-      return nameMatchesQuery(normaliseSearchText(hit.data?.name || ""), normQ);
+      return (
+        nameMatchesQuery(normaliseSearchText(hit.data?.name || ""), normQ) ||
+        fieldMatchesQuery(normaliseSearchText(hit.data?.subCategory || ""), normQ) ||
+        fieldMatchesQuery(normaliseSearchText(hit.data?.category?.name || ""), normQ)
+      );
     }
     return isStrictProductSearchMatch(hit.data, normQ);
   });
@@ -154,7 +161,7 @@ export const searchService = async ({ query, limit, page }) => {
  */
 const findMatchingCategories = async (normQ) => {
   const categories = await Category.find({ status: "Active" })
-    .select("_id name slug status")
+    .select("_id name slug status subCategories")
     .lean();
 
   const queryTokens = normQ.split(" ").filter(Boolean);
@@ -168,33 +175,38 @@ const findMatchingCategories = async (normQ) => {
     for (const cat of categories) {
       const normCat = normaliseSearchText(cat.name);
       const categoryWords = normCat.split(" ").filter(Boolean);
+      let isMatch = false;
+      const matchedSubs = new Set(cat.matchedSubCategories || []);
 
-      // Exact or variant match
+      // Exact or variant match on category name
       if (variants.some((v) => v === normCat)) {
-        if (!seenCategoryIds.has(cat._id.toString())) {
-          seenCategoryIds.add(cat._id.toString());
-          matches.push(cat);
-        }
-        continue;
-      }
-
-      // Also allow matching against words inside multi-word categories such as
-      // "kurta sets", so short or broken forms like "ku" / "krta" can still
-      // resolve the category through the main garment word.
-      if (
+        isMatch = true;
+      } else if (
         categoryWords.some((word) => isCategoryTermMatch(term, word, variants))
       ) {
-        if (!seenCategoryIds.has(cat._id.toString())) {
-          seenCategoryIds.add(cat._id.toString());
-          matches.push(cat);
-        }
-        continue;
+        isMatch = true;
+      } else if (term.length >= 4 && isCategoryTypoMatch(term, normCat)) {
+        isMatch = true;
       }
 
-      // Single-word typo tolerance for longer queries, kept strict enough to
-      // catch garment misspellings like "lenga" -> "lehenga" without making
-      // short generic queries too loose.
-      if (term.length >= 4 && isCategoryTypoMatch(term, normCat)) {
+      // Check subcategories
+      if (Array.isArray(cat.subCategories)) {
+        for (const sub of cat.subCategories) {
+          const normSub = normaliseSearchText(sub);
+          const subWords = normSub.split(" ").filter(Boolean);
+          if (
+            variants.some((v) => v === normSub) ||
+            subWords.some((word) => isCategoryTermMatch(term, word, variants)) ||
+            (term.length >= 4 && isCategoryTypoMatch(term, normSub))
+          ) {
+            isMatch = true;
+            matchedSubs.add(sub);
+          }
+        }
+      }
+
+      if (isMatch) {
+        cat.matchedSubCategories = Array.from(matchedSubs);
         if (!seenCategoryIds.has(cat._id.toString())) {
           seenCategoryIds.add(cat._id.toString());
           matches.push(cat);
@@ -208,6 +220,20 @@ const findMatchingCategories = async (normQ) => {
 
 const isCategoryTermMatch = (term, categoryWord, variants) => {
   if (!term || !categoryWord) return false;
+
+  // Prevent false collision between "suit(s)" and "set(s)"
+  if (
+    (term === "suit" || term === "suits") &&
+    (categoryWord === "set" || categoryWord === "sets")
+  ) {
+    return false;
+  }
+  if (
+    (term === "set" || term === "sets") &&
+    (categoryWord === "suit" || categoryWord === "suits")
+  ) {
+    return false;
+  }
 
   const termVariants = new Set([...variants]);
   const candidateWords = new Set([
@@ -263,36 +289,49 @@ const isStrongCategoryNearMiss = (term, candidate) => {
  * Joins both by category ObjectId reference AND by subCategory string
  * to catch products linked either way.
  */
-const getCategoryProducts = async (categoryId) => {
+const getCategoryProducts = async (categoryId, matchedSubCategories = []) => {
   // First get the category name for subCategory matching
-  const cat = await Category.findById(categoryId).select("name").lean();
+  const cat = await Category.findById(categoryId).select("name subCategories").lean();
   const catName = cat?.name || "";
 
-  const [byRef, bySubCat] = await Promise.all([
+  const subCatStrings = [
+    ...(catName ? [normaliseSearchText(catName)] : []),
+    ...(matchedSubCategories || []).map((s) => normaliseSearchText(s)),
+  ].filter(Boolean);
+
+  const subCatRegexes = subCatStrings.map(
+    (str) => new RegExp(`^${escapeRegex(str)}$`, "i"),
+  );
+
+  const queries = [
     Product.find({ category: categoryId, status: "Active" })
       .populate("category", "name slug")
       .lean(),
-    catName
-      ? Product.find({
-          subCategory: new RegExp(
-            `^${escapeRegex(normaliseSearchText(catName))}$`,
-            "i",
-          ),
-          status: "Active",
-        })
-          .populate("category", "name slug")
-          .lean()
-      : [],
-  ]);
+  ];
+
+  if (subCatRegexes.length > 0) {
+    queries.push(
+      Product.find({
+        subCategory: { $in: subCatRegexes },
+        status: "Active",
+      })
+        .populate("category", "name slug")
+        .lean(),
+    );
+  }
+
+  const results = await Promise.all(queries);
 
   // Merge and deduplicate
   const seen = new Set();
   const merged = [];
-  for (const p of [...byRef, ...bySubCat]) {
-    const id = p._id.toString();
-    if (!seen.has(id)) {
-      seen.add(id);
-      merged.push(p);
+  for (const list of results) {
+    for (const p of list) {
+      const id = p._id.toString();
+      if (!seen.has(id)) {
+        seen.add(id);
+        merged.push(p);
+      }
     }
   }
   return merged;
@@ -595,6 +634,21 @@ const consonantKey = (word) =>
 const fuzzyWordsMatch = (queryWord, productWord) => {
   if (queryWord === productWord) return true;
   if (queryWord.length < 3 || productWord.length < 3) return false;
+
+  // Prevent false collision between "suit(s)" and "set(s)"
+  if (
+    (queryWord === "suit" || queryWord === "suits") &&
+    (productWord === "set" || productWord === "sets")
+  ) {
+    return false;
+  }
+  if (
+    (queryWord === "set" || queryWord === "sets") &&
+    (productWord === "suit" || productWord === "suits")
+  ) {
+    return false;
+  }
+
   if (productWord.startsWith(queryWord) || queryWord.startsWith(productWord)) {
     return true;
   }

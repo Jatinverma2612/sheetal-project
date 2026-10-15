@@ -280,3 +280,53 @@ export const adminGetOrderStats = async (req, res, next) => {
     next(error);
   }
 };
+
+export const cancelOrder = async (req, res, next) => {
+  try {
+    const orderId = req.params.id;
+    const userId = req.user._id;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    if (
+      order.user.toString() !== userId.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized to cancel this order" });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Order is already cancelled" });
+    }
+
+    if (order.orderStatus === "Delivered" || order.orderStatus === "Returned") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel an order that is already ${order.orderStatus.toLowerCase()}`,
+      });
+    }
+
+    const updatedOrder = await orderService.updateOrderStatusService(
+      orderId,
+      "Cancelled",
+    );
+
+    return successResponse(
+      res,
+      200,
+      updatedOrder,
+      "Order cancelled successfully",
+    );
+  } catch (error) {
+    next(error);
+  }
+};

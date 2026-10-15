@@ -12,7 +12,38 @@ import logger from "../utils/logger.js";
 
 const router = express.Router();
 
-// ... your existing /coupon and /apply-coupon routes ...
+// ── GET /coupon ────────────────────────────────────────────────────────────
+// Fetch active abandoned cart recovery coupon for the authenticated user
+router.get("/coupon", isAuthenticated, async (req, res, next) => {
+  try {
+    const coupon = await getValidAbandonedCartCouponForUser({
+      userId: req.user._id,
+      cartId: req.query.cartId || null,
+    });
+    return successResponse(res, 200, coupon, "Abandoned cart coupon fetched successfully");
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── POST /apply-coupon ─────────────────────────────────────────────────────
+// Validate and apply an abandoned cart recovery coupon
+router.post("/apply-coupon", isAuthenticated, async (req, res, next) => {
+  try {
+    const { code, cartId } = req.body || {};
+    const result = await validateAndApplyAbandonedCartCoupon({
+      code,
+      userId: req.user._id,
+      cartId,
+    });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return successResponse(res, 200, result, result.message || "Coupon applied successfully");
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ── POST /abandoned-carts/push-coupon ──────────────────────────────────────
 // Admin only. Finds all abandoned carts that have NOT yet had a successful

@@ -43,12 +43,16 @@ export async function deleteEnquiry(id) {
  * Updates the status of an enquiry.
  * @param {string} id
  * @param {string} status - "new" | "read" | "replied"
+ * @param {string|null} reply - Optional reply message
  * @returns {Promise<Object>} updated enquiry
  */
-export async function updateEnquiryStatus(id, status) {
+export async function updateEnquiryStatus(id, status, reply = null) {
+  const payload = { status };
+  if (reply) payload.reply = reply;
+
   const { data } = await axios.patch(
     `${API_BASE_URL}/enquiry/${id}/status`,
-    { status },
+    payload,
     { withCredentials: true },
   );
   if (!data.success) throw new Error("Failed to update status");

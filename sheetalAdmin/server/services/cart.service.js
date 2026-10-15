@@ -55,6 +55,26 @@ const getVariantForCartItem = (product, cartItemLike) => {
     return null;
   }
 
+  const requestedVariantId = String(
+    cartItemLike?.variantId ||
+      cartItemLike?.variant?._id ||
+      cartItemLike?._id ||
+      "",
+  ).trim();
+
+  // 1. Exact match by Variant ID
+  if (requestedVariantId) {
+    const byId = product.variants.find(
+      (variant) => String(variant?._id || "").trim() === requestedVariantId,
+    );
+    if (byId) return byId;
+  }
+
+  const requestedSku = String(
+    cartItemLike?.variant?.v_sku || cartItemLike?.v_sku || "",
+  )
+    .trim()
+    .toUpperCase();
   const requestedColor = String(cartItemLike?.color || "")
     .trim()
     .toLowerCase();
@@ -62,29 +82,61 @@ const getVariantForCartItem = (product, cartItemLike) => {
     .trim()
     .toLowerCase();
 
-  if (requestedColor) {
-    const variant = product.variants.find(
-      (entry) =>
-        String(entry?.color?.name || "")
-          .trim()
-          .toLowerCase() === requestedColor,
-    );
-    if (variant) return variant;
+  // 2. Exact match by variant v_sku
+  if (requestedSku) {
+    const bySku = product.variants.find((variant) => {
+      const vSku = String(variant?.v_sku || "").trim().toUpperCase();
+      return vSku && vSku === requestedSku;
+    });
+    if (bySku) return bySku;
   }
 
+  // 3. Match by Color (support ObjectId string, populated colorId.name, or color.name)
+  if (requestedColor) {
+    const byColor = product.variants.find((variant) => {
+      const colorName = String(variant?.color?.name || variant?.color || "")
+        .trim()
+        .toLowerCase();
+      if (colorName && colorName === requestedColor) return true;
+
+      if (variant?.colorId && typeof variant.colorId === "object") {
+        const cIdName = String(variant.colorId.name || "")
+          .trim()
+          .toLowerCase();
+        if (cIdName && cIdName === requestedColor) return true;
+      }
+
+      const cIdStr = String(variant?.colorId?._id || variant?.colorId || "")
+        .trim()
+        .toLowerCase();
+      if (cIdStr && cIdStr === requestedColor) return true;
+
+      return false;
+    });
+    if (byColor) return byColor;
+  }
+
+  // 4. Fallback to size: Prefer variants that have positive stock for the requested size!
   if (requestedSize) {
-    return (
-      product.variants.find(
-        (entry) =>
-          Array.isArray(entry?.sizes) &&
-          entry.sizes.some(
-            (size) =>
-              String(size?.name || "")
-                .trim()
-                .toLowerCase() === requestedSize,
-          ),
-      ) || null
+    const inStockVariant = product.variants.find(
+      (variant) =>
+        Array.isArray(variant?.sizes) &&
+        variant.sizes.some((size) => {
+          const sName = String(size?.name || "").trim().toLowerCase();
+          return sName === requestedSize && Number(size?.stock) > 0;
+        }),
     );
+    if (inStockVariant) return inStockVariant;
+
+    const anySizeVariant = product.variants.find(
+      (variant) =>
+        Array.isArray(variant?.sizes) &&
+        variant.sizes.some((size) => {
+          const sName = String(size?.name || "").trim().toLowerCase();
+          return sName === requestedSize;
+        }),
+    );
+    if (anySizeVariant) return anySizeVariant;
   }
 
   return null;
@@ -175,10 +227,13 @@ export const addToCartService = async (
   price,
   discountPrice,
   variantImage,
+  variantId = null,
 ) => {
   const normalizedQuantity = normalizeQuantity(quantity);
   const cart = await Cart.findOne({ user: userId });
-  const product = await Product.findById(productId);
+  const product = await Product.findById(productId).populate(
+    "variants.colorId",
+  );
 
   if (!product) {
     throw new ErrorResponse("Product not found", 404);
@@ -189,12 +244,13 @@ export const addToCartService = async (
   }
 
   if (!cart) {
-    ensureCartItemStock(product, { size, color }, normalizedQuantity);
+    ensureCartItemStock(product, { size, color, variantId }, normalizedQuantity);
     const newCart = await Cart.create({
       user: userId,
       items: [
         {
           product: productId,
+          variantId,
           quantity: normalizedQuantity,
           size,
           color,
@@ -213,6 +269,7 @@ export const addToCartService = async (
   const existingItem = cart.items.find(
     (item) =>
       item.product.toString() === productId &&
+      (variantId && item.variantId ? item.variantId === variantId : true) &&
       item.size === size &&
       item.color === color,
   );
@@ -224,10 +281,14 @@ export const addToCartService = async (
     existingItem.price = price;
     existingItem.discountPrice = discountPrice;
     existingItem.variantImage = variantImage;
+    if (variantId && !existingItem.variantId) {
+      existingItem.variantId = variantId;
+    }
   } else {
-    ensureCartItemStock(product, { size, color }, normalizedQuantity);
+    ensureCartItemStock(product, { size, color, variantId }, normalizedQuantity);
     cart.items.push({
       product: productId,
+      variantId,
       quantity: normalizedQuantity,
       size,
       color,
@@ -323,7 +384,9 @@ export const updateCartItemQuantityService = async (
   if (normalizedQuantity <= 0) {
     cart.items = cart.items.filter((item) => item._id.toString() !== itemId);
   } else {
-    const product = await Product.findById(itemToUpdate.product);
+    const product = await Product.findById(itemToUpdate.product).populate(
+      "variants.colorId",
+    );
     if (!product) {
       throw new ErrorResponse("Product not found", 404);
     }

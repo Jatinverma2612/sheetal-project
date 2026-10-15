@@ -1,9 +1,47 @@
 import { API_BASE_URL } from "./api";
 
+// Helper function to get auth headers from localStorage
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") return {};
+  const token =
+    localStorage.getItem("token") || localStorage.getItem("adminToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const handleResponse = async (res) => {
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Something went wrong");
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    throw new Error(
+      `Server error (${res.status}): ${res.statusText || "Request failed"}`,
+    );
+  }
+  if (!res.ok) throw new Error(data?.message || "Something went wrong");
   return data;
+};
+
+// Timeout helper (defaults to 60s for file uploads to prevent infinite hangs)
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 60000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+    });
+    return res;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(
+        "Request timed out (server took longer than 60s). Please check image sizes and connection.",
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 export const getProducts = async (
@@ -24,24 +62,29 @@ export const getProducts = async (
 
   const res = await fetch(
     `${API_BASE_URL}/products/all?${params.toString()}`,
-    { credentials: "include" },
+    {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    },
   );
   return handleResponse(res);
 };
 
 export const createProduct = async (formData) => {
-  const res = await fetch(`${API_BASE_URL}/products/admin/new`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/products/admin/new`, {
     method: "POST",
     credentials: "include",
+    headers: getAuthHeaders(),
     body: formData,
   });
   return handleResponse(res);
 };
 
 export const updateProduct = async (id, formData) => {
-  const res = await fetch(`${API_BASE_URL}/products/admin/${id}`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/products/admin/${id}`, {
     method: "PUT",
     credentials: "include",
+    headers: getAuthHeaders(),
     body: formData,
   });
   return handleResponse(res);
@@ -51,6 +94,7 @@ export const deleteProduct = async (id) => {
   const res = await fetch(`${API_BASE_URL}/products/admin/${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -58,14 +102,16 @@ export const deleteProduct = async (id) => {
 export const getProductStats = async () => {
   const res = await fetch(`${API_BASE_URL}/products/admin/stats`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };
 
 export const bulkImportProducts = async (formData) => {
-  const res = await fetch(`${API_BASE_URL}/products/admin/import`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/products/admin/import`, {
     method: "POST",
     credentials: "include",
+    headers: getAuthHeaders(),
     body: formData,
   });
   return handleResponse(res);
@@ -74,6 +120,7 @@ export const bulkImportProducts = async (formData) => {
 export const downloadSampleExcel = async () => {
   const res = await fetch(`${API_BASE_URL}/products/admin/sample-excel`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to download sample file");
   return res.blob();
@@ -89,6 +136,7 @@ export const getProductDetails = async (id) => {
 export const getLowStockProducts = async () => {
   const res = await fetch(`${API_BASE_URL}/products/admin/low-stock`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -96,7 +144,10 @@ export const getLowStockProducts = async () => {
 export const getAdminReviews = async (page = 1, limit = 50, status = "all") => {
   const res = await fetch(
     `${API_BASE_URL}/products/admin/reviews?page=${page}&limit=${limit}&status=${status}`,
-    { credentials: "include" }
+    {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    }
   );
   return handleResponse(res);
 };
@@ -104,7 +155,10 @@ export const getAdminReviews = async (page = 1, limit = 50, status = "all") => {
 export const updateReviewStatusAdmin = async (id, data) => {
   const res = await fetch(`${API_BASE_URL}/products/admin/reviews/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     body: JSON.stringify(data),
   });
@@ -115,6 +169,7 @@ export const deleteReviewAdmin = async (id) => {
   const res = await fetch(`${API_BASE_URL}/products/admin/reviews?id=${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -149,6 +204,7 @@ export const getMostViewedProducts = async (
 
   const res = await fetch(`${API_BASE_URL}/products/admin/most-viewed?${query}`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.message);
@@ -160,7 +216,10 @@ export const getMostViewedProducts = async (
 export const starProduct = async (id, starred) => {
   const res = await fetch(`${API_BASE_URL}/products/admin/${id}/star`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     // Only send body when a specific state is requested
     body: JSON.stringify(starred !== undefined ? { starred } : {}),
@@ -171,7 +230,10 @@ export const starProduct = async (id, starred) => {
 export const reorderProducts = async (orderedIds) => {
   const res = await fetch(`${API_BASE_URL}/products/admin/reorder`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     body: JSON.stringify({ orderedIds }),
   });
@@ -188,7 +250,10 @@ export const reorderSingleProduct = async (productIdOrIds, payload) => {
 
   const res = await fetch(`${API_BASE_URL}/products/admin/reorder`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     body: JSON.stringify(body),
   });
@@ -196,14 +261,20 @@ export const reorderSingleProduct = async (productIdOrIds, payload) => {
 };
 
 export const getColors = async () => {
-  const res = await fetch(`${API_BASE_URL}/colors`, { credentials: "include" });
+  const res = await fetch(`${API_BASE_URL}/colors`, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
   return handleResponse(res);
 };
 
 export const createColor = async (colorData) => {
   const res = await fetch(`${API_BASE_URL}/colors`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     body: JSON.stringify(colorData),
   });
@@ -213,7 +284,10 @@ export const createColor = async (colorData) => {
 export const updateColor = async (id, colorData) => {
   const res = await fetch(`${API_BASE_URL}/colors/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     credentials: "include",
     body: JSON.stringify(colorData),
   });
@@ -224,6 +298,7 @@ export const deleteColor = async (id) => {
   const res = await fetch(`${API_BASE_URL}/colors/${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };

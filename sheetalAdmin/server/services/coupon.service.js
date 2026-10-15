@@ -67,6 +67,9 @@ const recordCouponUsage = async (couponId, userId) => {
   }
 
   coupon.usedCount = (coupon.usedCount || 0) + 1;
+  if (coupon.totalUsageLimit > 0 && coupon.usedCount >= coupon.totalUsageLimit) {
+    coupon.isActive = false;
+  }
   await coupon.save();
 };
 
@@ -332,12 +335,11 @@ export const applyCouponService = async ({
         );
 
         if (totalApplicableQuantity < coupon.buyQuantity + coupon.getQuantity) {
+          const requiredQty = coupon.buyQuantity + coupon.getQuantity;
           return {
             success: false,
             statusCode: 400,
-            message: `BOGO requires at least ${
-              coupon.buyQuantity + coupon.getQuantity
-            } qualifying items in cart`,
+            message: `BOGO offer requires at least ${requiredQty} qualifying items in cart (you have ${totalApplicableQuantity})`,
           };
         }
 

@@ -105,6 +105,64 @@ export const getSections = async (req, res, next) => {
         select: "name slug mainImage hoverImage variants price stock status category averageRating",
       });
 
+    const isAvailableProductForPublic = (p) => {
+      if (!p || !p._id || !p.slug || !p.name) return false;
+      if (p.status !== "Active" || p.isActive === false) return false;
+
+      const hasVariantSizes = p.variants?.some(
+        (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+      );
+      const hasInStockVariant = p.variants?.some((v) =>
+        v.sizes?.some((s) => Number(s.stock || 0) > 0),
+      );
+      const isInStock = hasVariantSizes
+        ? Boolean(hasInStockVariant) && (p.stock === undefined || p.stock > 0)
+        : Number(p.stock || 0) > 0;
+
+      if (!isInStock) return false;
+
+      let minPrice = Infinity;
+      p.variants?.forEach((v) => {
+        v.sizes?.forEach((s) => {
+          const eff =
+            s.discountPrice && s.discountPrice > 0 ? s.discountPrice : s.price;
+          if (eff > 0 && eff < minPrice) minPrice = eff;
+        });
+      });
+
+      if (minPrice === Infinity && Number(p.price || 0) > 0) {
+        minPrice = Number(p.price);
+      }
+
+      return minPrice > 0 && minPrice !== Infinity;
+    };
+
+    const collectionsObj =
+      homepage.collections?.toObject?.() || homepage.collections || {};
+    const trendingObj =
+      homepage.trendingThisWeek?.toObject?.() ||
+      homepage.trendingThisWeek ||
+      {};
+    const newArrivalsObj =
+      homepage.newArrivals?.toObject?.() || homepage.newArrivals || {};
+
+    const filteredCollections = {
+      ...collectionsObj,
+      products: (collectionsObj.products || []).filter(
+        isAvailableProductForPublic,
+      ),
+    };
+    const filteredTrending = {
+      ...trendingObj,
+      products: (trendingObj.products || []).filter(isAvailableProductForPublic),
+    };
+    const filteredNewArrivals = {
+      ...newArrivalsObj,
+      products: (newArrivalsObj.products || []).filter(
+        isAvailableProductForPublic,
+      ),
+    };
+
     res.status(200).json({
       success: true,
       sections: homepage.sections,
@@ -116,9 +174,9 @@ export const getSections = async (req, res, next) => {
       },
       aboutSBS: homepage.aboutSBS,
       hiddenBeauty: homepage.hiddenBeauty,
-      collections: homepage.collections,
-      trendingThisWeek: homepage.trendingThisWeek,
-      newArrivals: homepage.newArrivals,
+      collections: filteredCollections,
+      trendingThisWeek: filteredTrending,
+      newArrivals: filteredNewArrivals,
       instagramDiaries: homepage.instagramDiaries,
       testimonials: homepage.testimonials,
       blogs: homepage.blogs,

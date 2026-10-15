@@ -7,6 +7,7 @@ import {
   getImageAspectRatioWarning,
   validateVideoAspectRatio,
 } from "@/utils/imageAspectRatio";
+import { canonicalizeSizeName } from "@/utils/sizeUtils";
 
 const VARIANT_MEDIA_RATIO = { width: 3, height: 4 };
 const VARIANT_MEDIA_RATIO_LABEL = getRatioLabel(
@@ -176,7 +177,7 @@ export default function InventoryParams({
 
   const updateSize = (variantIndex, sizeIndex, field, value) => {
     if (field === "name") {
-      value = String(value || "").toUpperCase().slice(0, 4);
+      value = canonicalizeSizeName(value);
     }
     updateVariant(variantIndex, (v) => {
       const sizes = [...v.sizes];
@@ -199,11 +200,31 @@ export default function InventoryParams({
   };
 
   const handleAddVariant = () => {
-    const emptyVariant = createEmptyVariant();
-    // If free size is active, seed one locked row automatically
+    let sizesToUse = [];
     if (isFreeSize) {
-      emptyVariant.sizes = [FREE_SIZE_ROW()];
+      sizesToUse = [FREE_SIZE_ROW()];
+    } else if (
+      Array.isArray(formData.variants) &&
+      formData.variants.length > 0 &&
+      Array.isArray(formData.variants[0]?.sizes) &&
+      formData.variants[0].sizes.length > 0 &&
+      formData.variants[0].sizes.some((s) => String(s?.name || "").trim())
+    ) {
+      sizesToUse = formData.variants[0].sizes.map((s) => ({
+        name: canonicalizeSizeName(s.name),
+        price: s.price !== undefined ? s.price : 0,
+        discountPrice: s.discountPrice !== undefined ? s.discountPrice : 0,
+        stock: 0,
+      }));
+    } else {
+      sizesToUse = createEmptyVariant().sizes;
     }
+
+    const emptyVariant = {
+      ...createEmptyVariant(),
+      sizes: sizesToUse,
+    };
+
     setFormData((p) => ({
       ...p,
       variants: [...p.variants, emptyVariant],

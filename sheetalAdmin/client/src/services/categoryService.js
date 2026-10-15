@@ -1,9 +1,23 @@
 import { API_BASE_URL } from "./api";
 
+// Helper function to get auth headers from localStorage
+const getAuthHeaders = () => {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // Helper function to handle response (DRY Principle)
 const handleResponse = async (res) => {
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Something went wrong");
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    throw new Error(
+      `Server error (${res.status}): ${res.statusText || "Request failed"}`,
+    );
+  }
+  if (!res.ok) throw new Error(data?.message || "Something went wrong");
   return data;
 };
 
@@ -13,7 +27,10 @@ const handleResponse = async (res) => {
 export const getCategories = async (page = 1, limit = 50, search = "") => {
   const res = await fetch(
     `${API_BASE_URL}/categories/admin/all?page=${page}&limit=${limit}&search=${search}`,
-    { credentials: "include" },
+    {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    },
   );
   return handleResponse(res);
 };
@@ -32,12 +49,13 @@ export const fetchAllCategories = async () => {
    Add Category (Handles Files)
    ========================= */
 export const addCategory = async (formData) => {
-  // NOTE: Jab hum FormData bhejte hain, toh "Content-Type" header
-  // manually set NAHI karte, browser khud boundary set karta hai.
+  // NOTE: When sending FormData, browser automatically sets multipart/form-data
+  // boundary. We only supply Authorization headers.
   const res = await fetch(`${API_BASE_URL}/categories/admin`, {
     method: "POST",
     credentials: "include",
-    body: formData, // JSON.stringify nahi, seedha formData
+    headers: getAuthHeaders(),
+    body: formData,
   });
 
   return handleResponse(res);
@@ -50,7 +68,8 @@ export const updateCategory = async (id, formData) => {
   const res = await fetch(`${API_BASE_URL}/categories/admin/${id}`, {
     method: "PUT",
     credentials: "include",
-    body: formData, // Direct FormData for image support
+    headers: getAuthHeaders(),
+    body: formData,
   });
 
   return handleResponse(res);
@@ -63,6 +82,7 @@ export const deleteCategory = async (id) => {
   const res = await fetch(`${API_BASE_URL}/categories/admin/${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: getAuthHeaders(),
   });
 
   return handleResponse(res);
@@ -76,6 +96,7 @@ export const reorderCategories = async (orderedIds) => {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     credentials: "include",
     body: JSON.stringify({ orderedIds }),
@@ -89,6 +110,7 @@ export const reorderCategories = async (orderedIds) => {
 export const getCategoryStats = async () => {
   const res = await fetch(`${API_BASE_URL}/categories/admin/stats`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 };

@@ -1,6 +1,7 @@
 import * as categoryService from "../services/category.service.js";
 import successResponse from "../utils/successResponse.js";
 import { deleteFile, deleteS3File } from "../utils/fileHelper.js";
+import { deleteStorageAsset } from "../storage/index.js";
 import SeoSettings from "../models/seosettings.model.js";
 import Product from "../models/product.model.js";
 import { generateCategorySchema } from "../utils/schemaGenerator.js";
@@ -9,10 +10,12 @@ const cleanupFiles = async (files) => {
   if (!files) return;
   const fileArray = Object.values(files).flat();
   for (const file of fileArray) {
-    if (file.key) {
-      await deleteS3File(file.key);
-    } else if (file.path) {
-      await deleteFile(file.path);
+    const publicId = file.public_id || file.key || "";
+    const url = file.location || file.path || file.url || "";
+    try {
+      await deleteStorageAsset(publicId, url);
+    } catch (e) {
+      // Best-effort cleanup
     }
   }
 };

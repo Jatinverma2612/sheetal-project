@@ -108,7 +108,9 @@ const LoginForm = () => {
       : loginCoupon?.offerType === "FixedAmount"
         ? `Flat ₹${loginCoupon.offerValue} off`
         : loginCoupon?.offerType === "BOGO"
-          ? "Buy One Get One Free"
+          ? (loginCoupon as any).buyQuantity && (loginCoupon as any).getQuantity
+            ? `Buy ${(loginCoupon as any).buyQuantity} Get ${(loginCoupon as any).getQuantity} Free`
+            : "Buy One Get One Free"
           : "Special login offer");
   const loginCouponCode =
     loginCoupon?.couponType === "CouponCode" ? loginCoupon.code || null : null;

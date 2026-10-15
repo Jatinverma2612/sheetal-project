@@ -216,6 +216,7 @@ export default function ContactEnquiriesPage() {
           deletingId={pendingAction?.action === "delete" ? pendingAction.id : null}
           onSelect={handleSelect}
           onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
         />
 
         {/* Pagination UI */}

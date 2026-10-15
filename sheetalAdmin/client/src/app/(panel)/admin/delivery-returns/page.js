@@ -271,12 +271,12 @@ export default function DeliveryReturnsPage() {
                   onChange={(e) => {
                     const digits = e.target.value
                       .replace(/\D/g, "")
-                      .slice(0, 10);
+                      .slice(0, 15);
                     setSettings({ ...settings, supportWhatsapp: digits });
                   }}
                   className={`${inputStyle} pl-11`}
-                  placeholder="9199588139"
-                  maxLength={10}
+                  placeholder="919958813913"
+                  maxLength={15}
                 />
               </div>
               <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">

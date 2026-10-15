@@ -154,8 +154,10 @@ export default function CouponModal({
       ...formData,
       code:
         formData.couponType === "FestiveSale"
-          ? `AUTO-${Date.now()}`
-          : formData.code,
+          ? formData.code?.trim()
+            ? formData.code.trim().toUpperCase()
+            : `AUTO-${Date.now()}`
+          : formData.code?.trim().toUpperCase(),
       isActive: formData.status === "Active",
       offerValue:
         formData.offerType === "BOGO" ? 0 : Number(formData.offerValue),
@@ -188,7 +190,10 @@ export default function CouponModal({
         onClose();
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save coupon. Please try again.");
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to save coupon. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

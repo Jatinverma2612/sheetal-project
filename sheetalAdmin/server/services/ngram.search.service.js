@@ -135,7 +135,14 @@ const documentNgrams = (doc) => {
   }
 
   // Category type
-  const blob = [doc.name, doc.slug, doc.description].filter(Boolean).join(" ");
+  const blob = [
+    doc.name,
+    doc.slug,
+    doc.description,
+    ...(doc.subCategories || []),
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return generateNgrams(blob);
 };
@@ -164,7 +171,14 @@ const documentPrimaryNgrams = (doc) => {
     return generateNgrams(blob);
   }
 
-  const blob = [doc.name, doc.slug, doc.category].filter(Boolean).join(" ");
+  const blob = [
+    doc.name,
+    doc.slug,
+    doc.category,
+    ...(doc.subCategories || []),
+  ]
+    .filter(Boolean)
+    .join(" ");
   return generateNgrams(blob);
 };
 
@@ -265,6 +279,20 @@ const fuzzyWordsMatch = (qWord, pWord) => {
   if (qWord === pWord) return true;
   if (qWord.length < MIN_FUZZY_LENGTH || pWord.length < MIN_FUZZY_LENGTH)
     return false;
+
+  // Prevent false collision between "suit(s)" and "set(s)"
+  if (
+    (qWord === "suit" || qWord === "suits") &&
+    (pWord === "set" || pWord === "sets")
+  ) {
+    return false;
+  }
+  if (
+    (qWord === "set" || qWord === "sets") &&
+    (pWord === "suit" || pWord === "suits")
+  ) {
+    return false;
+  }
 
   // Prefix containment
   if (pWord.startsWith(qWord) || qWord.startsWith(pWord)) return true;
@@ -408,7 +436,7 @@ const buildProductDoc = (product) => {
       v.sizes?.forEach((s) => {
         const eff =
           s.discountPrice && s.discountPrice > 0 ? s.discountPrice : s.price;
-        if (eff < minPrice) {
+        if (eff > 0 && eff < minPrice) {
           minPrice = eff;
           relatedMrp = s.price;
         }
@@ -431,6 +459,7 @@ const buildCategoryDoc = (category) => ({
   name: category.name || "",
   slug: category.slug || "",
   description: category.description || "",
+  subCategories: category.subCategories || [],
   image: category.mainImage || null,
   status: category.status,
 });
@@ -815,13 +844,27 @@ export const searchNgram = async (query, options = {}) => {
       // Drop products that didn't match in any tier
       if (finalScore === 0) continue;
     } else if (doc.type === "category") {
-      // ── Tier 3: Category name ────────────────────────────────────────
-      // Categories are always matched by name regardless of query length.
+      // ── Tier 3: Category name / subCategory ──────────────────────────
+      // Categories are matched by name or subcategory.
       const catMatch = scoreNameMatch(normQ, normName, TIER.CATEGORY_NAME, {
         allowFuzzy: false,
       });
-      if (!catMatch) continue;
-      finalScore = catMatch.score;
+      if (catMatch) {
+        finalScore = catMatch.score;
+      } else if (Array.isArray(doc.subCategories) && doc.subCategories.length > 0) {
+        for (const sub of doc.subCategories) {
+          const subMatch = scoreNameMatch(
+            normQ,
+            normaliseSearchText(sub),
+            TIER.CATEGORY_NAME - 500,
+            { allowFuzzy: false },
+          );
+          if (subMatch) {
+            finalScore = Math.max(finalScore, subMatch.score);
+          }
+        }
+      }
+      if (finalScore === 0) continue;
     }
 
     tieredResults.push({ docId, finalScore });

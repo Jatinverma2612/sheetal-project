@@ -5,6 +5,7 @@ import Order from "../models/order.model.js";
 import ProductView from "../models/productView.model.js";
 import Category from "../models/category.model.js";
 import { deleteFile, deleteS3File, uploadS3File } from "../utils/fileHelper.js";
+import { deleteStorageAsset } from "../storage/index.js";
 import { config } from "../config/config.js";
 import xlsx from "xlsx";
 import mongoose from "mongoose";
@@ -38,12 +39,61 @@ const toTitleCase = (str) => {
     .join(" ");
 };
 
-const normalizeSizeName = (name) => {
+export const canonicalizeSizeName = (name) => {
   if (!name) return "";
   const trimmed = name.toString().trim();
-  if (trimmed.toLowerCase() === "free size") return "Free Size";
-  return trimmed.toUpperCase();
+  if (!trimmed) return "";
+  const upper = trimmed.toUpperCase().replace(/\s+/g, " ");
+
+  const aliasMap = {
+    S: "S",
+    SMALL: "S",
+    M: "M",
+    MED: "M",
+    MEDIUM: "M",
+    L: "L",
+    LRG: "L",
+    LARGE: "L",
+    XL: "XL",
+    XLARGE: "XL",
+    "X-LARGE": "XL",
+    "EXTRA LARGE": "XL",
+    "EXTRA-LARGE": "XL",
+    "2XL": "2XL",
+    XXL: "2XL",
+    "2-XL": "2XL",
+    "XX-LARGE": "2XL",
+    "3XL": "3XL",
+    XXXL: "3XL",
+    "3-XL": "3XL",
+    "XXX-LARGE": "3XL",
+    "4XL": "4XL",
+    XXXXL: "4XL",
+    "4-XL": "4XL",
+    "XXXX-LARGE": "4XL",
+    "5XL": "5XL",
+    XXXXXL: "5XL",
+    "5-XL": "5XL",
+    "6XL": "6XL",
+    XXXXXXL: "6XL",
+    "6-XL": "6XL",
+    "FREE SIZE": "Free Size",
+    FREESIZE: "Free Size",
+    "FREE-SIZE": "Free Size",
+    FREE: "Free Size",
+    "ONE SIZE": "Free Size",
+    ONESIZE: "Free Size",
+    "ONE-SIZE": "Free Size",
+  };
+
+  if (aliasMap[upper]) {
+    return aliasMap[upper];
+  }
+
+  return upper;
 };
+
+const normalizeSizeName = (name) => canonicalizeSizeName(name);
 
 const deduplicateVariants = (variants) => {
   if (!Array.isArray(variants)) return [];
@@ -103,14 +153,14 @@ const deduplicateVariants = (variants) => {
 };
 
 const buildUploadedImage = (file, alt) => ({
-  url: file.location || file.path,
-  public_id: file.key || file.filename,
+  url: file.location || file.url || file.path,
+  public_id: file.public_id || file.key || file.filename,
   alt,
 });
 
 const buildUploadedVideo = (file) => ({
-  url: file.location || file.path,
-  public_id: file.key || file.filename,
+  url: file.location || file.url || file.path,
+  public_id: file.public_id || file.key || file.filename,
   mimeType: file.mimetype || "video/mp4",
   size: file.size,
 });
@@ -189,9 +239,11 @@ const collectVariantMediaMap = (variants) => {
 const cleanupMediaItems = async (items) => {
   for (const item of items) {
     if (!item) continue;
-    if (item.public_id) await deleteS3File(item.public_id);
-    else if (item.url && !item.url.startsWith("http"))
-      await deleteFile(item.url);
+    const identifier = item.public_id || item.key;
+    const url = item.url;
+    if (identifier || url) {
+      await deleteStorageAsset(identifier, url);
+    }
   }
 };
 
@@ -537,28 +589,59 @@ export const getAllProductsService = async (queryStr) => {
   };
 };
 
+const isAvailableForDisplay = (p) => {
+  if (!p || p.status !== "Active" || p.isActive === false) return false;
+  const hasVariantSizes = p.variants?.some(
+    (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+  );
+  const isInStock = hasVariantSizes
+    ? p.variants.some((v) => v.sizes?.some((s) => Number(s.stock || 0) > 0)) &&
+      (p.stock === undefined || p.stock > 0)
+    : Number(p.stock || 0) > 0;
+  if (!isInStock) return false;
+
+  let minPrice = Infinity;
+  p.variants?.forEach((v) => {
+    v.sizes?.forEach((s) => {
+      const eff =
+        s.discountPrice && s.discountPrice > 0 ? s.discountPrice : s.price;
+      if (eff > 0 && eff < minPrice) minPrice = eff;
+    });
+  });
+  if (minPrice === Infinity && Number(p.price || 0) > 0) {
+    minPrice = Number(p.price);
+  }
+  return minPrice > 0 && minPrice !== Infinity;
+};
+
 export const getNewArrivalsService = async () => {
-  const flagged = await Product.find({ isNewArrival: true, status: "Active" })
+  const flagged = await Product.find({
+    isNewArrival: true,
+    status: "Active",
+    stock: { $gt: 0 },
+  })
     .sort({ createdAt: -1 })
     .populate("category", "name slug")
     .populate("variants.colorId")
     .lean();
 
-  let products = flagged;
+  let products = flagged.filter(isAvailableForDisplay);
 
-  if (flagged.length < 10) {
-    const excludeIds = flagged.map((p) => p._id);
+  if (products.length < 10) {
+    const excludeIds = products.map((p) => p._id);
     const backfill = await Product.find({
       _id: { $nin: excludeIds },
       status: "Active",
+      stock: { $gt: 0 },
     })
       .sort({ createdAt: -1 })
-      .limit(10 - flagged.length)
+      .limit(20)
       .populate("category", "name slug")
       .populate("variants.colorId")
       .lean();
 
-    products = [...flagged, ...backfill];
+    const availableBackfill = backfill.filter(isAvailableForDisplay);
+    products = [...products, ...availableBackfill].slice(0, 10);
   }
 
   return { success: true, products: products.map(sanitizeProductRecord) };
@@ -701,33 +784,33 @@ export const createProductService = async (data, files, userId) => {
 
   const mainImage = {
     url: files?.mainImage
-      ? files.mainImage[0].location || files.mainImage[0].path
-      : "",
+      ? files.mainImage[0].location || files.mainImage[0].url || files.mainImage[0].path
+      : data.existingMainImage || "",
     public_id: files?.mainImage
-      ? files.mainImage[0].key || files.mainImage[0].filename
-      : "",
+      ? files.mainImage[0].public_id || files.mainImage[0].key || files.mainImage[0].filename
+      : data.existingMainImagePublicId || "",
     alt: data.mainImageAlt || `${parsedData.name} main image`,
   };
 
   const hoverImage = {
     url: files?.hoverImage
-      ? files.hoverImage[0].location || files.hoverImage[0].path
-      : "",
+      ? files.hoverImage[0].location || files.hoverImage[0].url || files.hoverImage[0].path
+      : data.existingHoverImage || "",
     public_id: files?.hoverImage
-      ? files.hoverImage[0].key || files.hoverImage[0].filename
-      : "",
+      ? files.hoverImage[0].public_id || files.hoverImage[0].key || files.hoverImage[0].filename
+      : data.existingHoverImagePublicId || "",
     alt: data.hoverImageAlt || `${parsedData.name} hover image`,
   };
 
   const ogImage = files?.ogImage
-    ? files.ogImage[0].location || files.ogImage[0].path
-    : "";
+    ? files.ogImage[0].location || files.ogImage[0].url || files.ogImage[0].path
+    : data.existingOgImage || "";
 
   let galleryImages = [];
   if (files?.images) {
     galleryImages = files.images.map((file, index) => ({
-      url: file.location || file.path,
-      public_id: file.key || file.filename,
+      url: file.location || file.url || file.path,
+      public_id: file.public_id || file.key || file.filename,
       alt: `${parsedData.name} gallery ${index + 1}`,
       isDefault: false,
     }));
@@ -749,7 +832,7 @@ export const createProductService = async (data, files, userId) => {
     parsedData.variants = parsedData.variants.map((v) => {
       const processedSizes = v.sizes.map((s) => ({
         ...s,
-        name: s.name,
+        name: normalizeSizeName(s.name),
         stock: Number(s.stock || 0),
         price: Number(s.price || 0),
         discountPrice: Number(s.discountPrice || 0),
@@ -807,8 +890,8 @@ export const createProductService = async (data, files, userId) => {
     images: galleryImages,
     video: files?.video
       ? {
-          url: files.video[0].location || files.video[0].path,
-          public_id: files.video[0].key || files.video[0].filename,
+          url: files.video[0].location || files.video[0].url || files.video[0].path,
+          public_id: files.video[0].public_id || files.video[0].key || files.video[0].filename,
         }
       : null,
     stock: totalStock,
@@ -927,17 +1010,13 @@ export const updateProductService = async (id, data, files) => {
   }
 
   if (files && files["mainImage"]?.[0]) {
-    if (product.mainImage?.public_id)
-      await deleteS3File(product.mainImage.public_id);
-    else if (
-      product.mainImage?.url &&
-      !product.mainImage.url.startsWith("http")
-    )
-      await deleteFile(product.mainImage.url);
+    if (product.mainImage?.public_id || product.mainImage?.url) {
+      await deleteStorageAsset(product.mainImage.public_id, product.mainImage.url);
+    }
 
     parsedData.mainImage = {
-      url: files["mainImage"][0].location || files["mainImage"][0].path,
-      public_id: files["mainImage"][0].key || files["mainImage"][0].filename,
+      url: files["mainImage"][0].location || files["mainImage"][0].url || files["mainImage"][0].path,
+      public_id: files["mainImage"][0].public_id || files["mainImage"][0].key || files["mainImage"][0].filename,
       alt: data.mainImageAlt || parsedData.name,
     };
   } else if (data.mainImageAlt) {
@@ -945,17 +1024,13 @@ export const updateProductService = async (id, data, files) => {
   }
 
   if (files && files["hoverImage"]?.[0]) {
-    if (product.hoverImage?.public_id)
-      await deleteS3File(product.hoverImage.public_id);
-    else if (
-      product.hoverImage?.url &&
-      !product.hoverImage.url.startsWith("http")
-    )
-      await deleteFile(product.hoverImage.url);
+    if (product.hoverImage?.public_id || product.hoverImage?.url) {
+      await deleteStorageAsset(product.hoverImage.public_id, product.hoverImage.url);
+    }
 
     parsedData.hoverImage = {
-      url: files["hoverImage"][0].location || files["hoverImage"][0].path,
-      public_id: files["hoverImage"][0].key || files["hoverImage"][0].filename,
+      url: files["hoverImage"][0].location || files["hoverImage"][0].url || files["hoverImage"][0].path,
+      public_id: files["hoverImage"][0].public_id || files["hoverImage"][0].key || files["hoverImage"][0].filename,
       alt: data.hoverImageAlt || parsedData.name,
     };
   } else if (data.hoverImageAlt) {
@@ -963,13 +1038,13 @@ export const updateProductService = async (id, data, files) => {
   }
 
   if (files && files["video"]?.[0]) {
-    if (product.video?.public_id) await deleteS3File(product.video.public_id);
-    else if (product.video?.url && !product.video.url.startsWith("http"))
-      await deleteFile(product.video.url);
+    if (product.video?.public_id || product.video?.url) {
+      await deleteStorageAsset(product.video.public_id, product.video.url);
+    }
 
     parsedData.video = {
-      url: files["video"][0].location || files["video"][0].path,
-      public_id: files["video"][0].key || files["video"][0].filename,
+      url: files["video"][0].location || files["video"][0].url || files["video"][0].path,
+      public_id: files["video"][0].public_id || files["video"][0].key || files["video"][0].filename,
     };
   } else if (data.existingVideo) {
     // Keep existing
@@ -984,6 +1059,7 @@ export const updateProductService = async (id, data, files) => {
 
   let totalStock = 0;
   if (parsedData.variants && Array.isArray(parsedData.variants)) {
+    parsedData.variants = deduplicateVariants(parsedData.variants);
     let variantFileIndex = 0;
     const uploadedVariantFiles = files?.["variantImages"] || [];
     const uploadedVariantGalleryFiles = [
@@ -998,7 +1074,7 @@ export const updateProductService = async (id, data, files) => {
     parsedData.variants = parsedData.variants.map((v) => {
       const processedSizes = v.sizes.map((s) => ({
         ...s,
-        name: s.name,
+        name: normalizeSizeName(s.name),
         stock: Number(s.stock || 0),
         price: Number(s.price || 0),
         discountPrice: Number(s.discountPrice || 0),
@@ -1174,30 +1250,25 @@ export const deleteProductService = async (id) => {
   const product = await Product.findById(id);
   if (!product) return { success: false, statusCode: 404 };
 
-  if (product.mainImage?.public_id)
-    await deleteS3File(product.mainImage.public_id);
-  else if (product.mainImage?.url && !product.mainImage.url.startsWith("http"))
-    await deleteFile(product.mainImage.url);
+  if (product.mainImage?.public_id || product.mainImage?.url) {
+    await deleteStorageAsset(product.mainImage.public_id, product.mainImage.url);
+  }
 
-  if (product.hoverImage?.public_id)
-    await deleteS3File(product.hoverImage.public_id);
-  else if (
-    product.hoverImage?.url &&
-    !product.hoverImage.url.startsWith("http")
-  )
-    await deleteFile(product.hoverImage.url);
+  if (product.hoverImage?.public_id || product.hoverImage?.url) {
+    await deleteStorageAsset(product.hoverImage.public_id, product.hoverImage.url);
+  }
 
   if (product.images) {
     for (const img of product.images) {
-      if (img.public_id) await deleteS3File(img.public_id);
-      else if (img.url && !img.url.startsWith("http"))
-        await deleteFile(img.url);
+      if (img.public_id || img.url) {
+        await deleteStorageAsset(img.public_id, img.url);
+      }
     }
   }
 
-  if (product.video?.public_id) await deleteS3File(product.video.public_id);
-  else if (product.video?.url && !product.video.url.startsWith("http"))
-    await deleteFile(product.video.url);
+  if (product.video?.public_id || product.video?.url) {
+    await deleteStorageAsset(product.video.public_id, product.video.url);
+  }
 
   const variantMediaItems = Array.from(
     collectVariantMediaMap(product.variants).values(),
@@ -2507,13 +2578,16 @@ export const getTrendingProductsService = async () => {
   const products = await Product.find({
     isTrending: true,
     status: "Active",
+    stock: { $gt: 0 },
   })
     .sort({ createdAt: -1 })
     .populate("category", "name slug")
     .populate("variants.colorId")
     .lean();
 
-  return { success: true, products: products.map(sanitizeProductRecord) };
+  const available = products.filter(isAvailableForDisplay);
+
+  return { success: true, products: available.map(sanitizeProductRecord) };
 };
 
 export const fetchCollectionProducts = async () => {

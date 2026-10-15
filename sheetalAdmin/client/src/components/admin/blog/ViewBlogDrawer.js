@@ -86,7 +86,7 @@ export default function ViewBlogDrawer({ isOpen, onClose, blog }) {
                   Author
                 </p>
                 <p className="text-xs font-bold text-slate-900">
-                  {blog.author?.name || "Admin"}
+                  {blog.authorName || blog.author?.name || "Admin"}
                 </p>
               </div>
             </div>

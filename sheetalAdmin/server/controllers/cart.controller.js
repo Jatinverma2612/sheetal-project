@@ -23,6 +23,7 @@ export const addToCart = async (req, res, next) => {
   try {
     const {
       productId,
+      variantId,
       quantity,
       size,
       color,
@@ -39,6 +40,7 @@ export const addToCart = async (req, res, next) => {
       price,
       discountPrice,
       variantImage,
+      variantId,
     );
     return successResponse(
       res,

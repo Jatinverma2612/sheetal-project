@@ -31,7 +31,9 @@ const orderSchema = new mongoose.Schema(
           type: Boolean,
           default: true,
         },
+        variantId: { type: String },
         variant: {
+          _id: String,
           size: String,
           color: String,
           v_sku: String,

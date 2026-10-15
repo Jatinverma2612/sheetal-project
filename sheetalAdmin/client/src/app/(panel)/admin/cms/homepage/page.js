@@ -9,6 +9,9 @@ import {
   EyeOff,
   Edit2,
   Search,
+  AlertCircle,
+  RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -73,9 +76,17 @@ const DEFAULT_TOP_INFO_CONFIG = {
   customCtaHref: "/product-list",
 };
 
+const getAuthHeaders = () => {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export default function HomepageSectionsForm() {
   const [sections, setSections] = useState({});
+  const [savedSections, setSavedSections] = useState({});
   const [topInfoConfig, setTopInfoConfig] = useState(DEFAULT_TOP_INFO_CONFIG);
+  const [savedTopInfoConfig, setSavedTopInfoConfig] = useState(DEFAULT_TOP_INFO_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const lastVisibleTopInfoModeRef = useRef("coupon");
@@ -83,16 +94,23 @@ export default function HomepageSectionsForm() {
   useEffect(() => {
     const fetchSections = async () => {
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/homepage/sections`);
+        const headers = getAuthHeaders();
+        const { data } = await axios.get(`${API_BASE_URL}/homepage/sections`, {
+          headers,
+          withCredentials: true,
+        });
         if (data.success) {
-          setSections(data.sections || {});
-          const nextTopInfoConfig = {
+          const loadedSections = data.sections || {};
+          const loadedTopInfoConfig = {
             ...DEFAULT_TOP_INFO_CONFIG,
             ...(data.topInfoConfig || {}),
           };
-          setTopInfoConfig(nextTopInfoConfig);
-          if (nextTopInfoConfig.mode !== "hidden") {
-            lastVisibleTopInfoModeRef.current = nextTopInfoConfig.mode;
+          setSections(loadedSections);
+          setSavedSections(loadedSections);
+          setTopInfoConfig(loadedTopInfoConfig);
+          setSavedTopInfoConfig(loadedTopInfoConfig);
+          if (loadedTopInfoConfig.mode !== "hidden") {
+            lastVisibleTopInfoModeRef.current = loadedTopInfoConfig.mode;
           }
         }
       } catch {
@@ -150,33 +168,63 @@ export default function HomepageSectionsForm() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (overrideSections, overrideTopInfoConfig) => {
     setIsSaving(true);
+    const targetSections = overrideSections || sections;
+    const targetTopInfoConfig = overrideTopInfoConfig || topInfoConfig;
+
     try {
+      const headers = getAuthHeaders();
       const { data } = await axios.patch(
         `${API_BASE_URL}/homepage/sections`,
-        { sections, topInfoConfig },
-        { withCredentials: true },
+        { sections: targetSections, topInfoConfig: targetTopInfoConfig },
+        {
+          headers,
+          withCredentials: true,
+        },
       );
       if (data.success) {
-        setSections(data.sections || {});
+        const nextSections = data.sections || targetSections;
         const nextTopInfoConfig = {
           ...DEFAULT_TOP_INFO_CONFIG,
-          ...(data.topInfoConfig || {}),
+          ...(data.topInfoConfig || targetTopInfoConfig || {}),
         };
+        setSections(nextSections);
+        setSavedSections(nextSections);
         setTopInfoConfig(nextTopInfoConfig);
+        setSavedTopInfoConfig(nextTopInfoConfig);
         if (nextTopInfoConfig.mode !== "hidden") {
           lastVisibleTopInfoModeRef.current = nextTopInfoConfig.mode;
         }
 
-        toast.success("Homepage updated!");
+        const isBarVisible =
+          nextSections.topInfo !== false &&
+          nextTopInfoConfig.mode !== "hidden";
+        toast.success(
+          `Homepage updated! (Top Info Bar is ${isBarVisible ? "visible" : "hidden"})`,
+        );
+      } else {
+        toast.error(data.message || "Failed to save settings");
       }
-    } catch {
-      toast.error("Failed to save settings");
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.message || err.message || "Failed to save settings";
+      toast.error(`Save failed: ${errMsg}`);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleDiscard = () => {
+    setSections(savedSections);
+    setTopInfoConfig(savedTopInfoConfig);
+    toast.success("Changes reverted");
+  };
+
+  const hasUnsavedChanges =
+    !isLoading &&
+    (JSON.stringify(sections) !== JSON.stringify(savedSections) ||
+      JSON.stringify(topInfoConfig) !== JSON.stringify(savedTopInfoConfig));
 
   const visibleCount = Object.values(sections).filter(Boolean).length;
   const totalCount = Object.keys(SECTION_LABELS).length;
@@ -311,13 +359,28 @@ export default function HomepageSectionsForm() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="text-sm font-black text-slate-900 uppercase">
-            Top Info Content
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-0.5">
-            Choose whether the top bar shows a homepage coupon, a custom announcement, or stays hidden.
-          </p>
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-black text-slate-900 uppercase">
+              Top Info Content
+            </h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Choose whether the top bar shows a homepage coupon, a custom announcement, or stays hidden.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSave()}
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-sm shrink-0"
+          >
+            {isSaving ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : (
+              <Save size={14} />
+            )}
+            <span>Save Top Info</span>
+          </button>
         </div>
 
         <div className="p-6 space-y-5">
@@ -411,7 +474,8 @@ export default function HomepageSectionsForm() {
       {/* Save */}
       <div className="flex justify-end pt-2 border-t border-slate-200">
         <button
-          onClick={handleSave}
+          type="button"
+          onClick={() => handleSave()}
           disabled={isSaving}
           className="flex items-center gap-2 bg-slate-900 cursor-pointer text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg"
         >
@@ -428,6 +492,46 @@ export default function HomepageSectionsForm() {
           )}
         </button>
       </div>
+
+      {/* Sticky Floating Save Bar */}
+      {hasUnsavedChanges && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900/95 text-white px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+            <AlertCircle size={16} />
+            <span>Unsaved Changes</span>
+          </div>
+          <div className="h-4 w-px bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDiscard}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw size={14} />
+              <span>Discard</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="animate-spin" size={14} />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={14} />
+                  <span>Save Changes Now</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

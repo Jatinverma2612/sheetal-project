@@ -50,6 +50,7 @@ export default function BlogModal({
     tags: "",
     isPublished: true,
     status: "Active",
+    authorName: "Admin",
     bannerImage: null,
     contentImage: null,
     metaTitle: "",
@@ -72,6 +73,8 @@ export default function BlogModal({
         tags: initialData?.tags?.join(", ") || "",
         isPublished: initialData?.isPublished ?? true,
         status: initialData?.status || "Active",
+        authorName:
+          initialData?.authorName || initialData?.author?.name || "Admin",
         bannerImage: null,
         contentImage: null,
         metaTitle: initialData?.metaTitle || "",
@@ -218,8 +221,22 @@ export default function BlogModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.content || formData.content === "<p></p>") {
-      return toast.error("Blog content is required. Please write something before publishing.");
+
+    if (!formData.title?.trim()) {
+      return toast.error("Blog title is required.");
+    }
+
+    const textContent = (formData.content || "")
+      .replace(/<[^>]*>/g, "")
+      .trim();
+    if (!textContent) {
+      return toast.error(
+        "Blog content is required. Please write something before publishing.",
+      );
+    }
+
+    if (!initialData && !formData.bannerImage) {
+      return toast.error("Please upload a banner image before publishing.");
     }
 
     setLoading(true);
@@ -246,9 +263,11 @@ export default function BlogModal({
         onClose();
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Failed to save blog post. Please try again.";
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to save blog post. Please try again.";
       toast.error(errorMessage);
-      console.error("Submission error:", err);
     } finally {
       setLoading(false);
     }
@@ -430,6 +449,19 @@ export default function BlogModal({
                           <option value="Active">Active</option>
                           <option value="Inactive">Inactive</option>
                         </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Author Name
+                        </label>
+                        <input
+                          name="authorName"
+                          value={formData.authorName}
+                          onChange={handleChange}
+                          placeholder="e.g. Admin or Sheetal"
+                          className="w-full bg-white border border-slate-400 px-4 py-2.5 rounded-lg text-sm text-slate-900 placeholder:text-slate-500 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none transition"
+                        />
                       </div>
                     </div>
 

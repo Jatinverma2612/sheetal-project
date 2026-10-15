@@ -195,7 +195,9 @@ export const createPaymentLinkService = async (
       gstPercent: product.gstPercent || 0,
       itemStatus: "Processing",
       inventoryAdjusted: false,
+      variantId: item.variantId || item.variant?._id || null,
       variant: {
+        _id: item.variantId || item.variant?._id || null,
         size: item.size,
         color: item.color,
         v_sku: item.variantSku || item.variant?.v_sku || item.v_sku || "",

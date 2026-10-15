@@ -107,15 +107,15 @@ export default function EnquiriesPage() {
     }
   };
 
-  const handleStatusChange = async (id, status, silent = false) => {
+  const handleStatusChange = async (id, status, silent = false, reply = null) => {
     setPendingAction({ id, action: "status", targetStatus: status });
     try {
-      const updated = await updateEnquiryStatus(id, status);
+      const updated = await updateEnquiryStatus(id, status, reply);
       await loadEnquiries();
       if (selected?._id === id) setSelected(updated);
-      if (!silent) toast.success("Status updated");
+      if (!silent) toast.success(status === "replied" ? "Reply sent successfully" : "Status updated");
     } catch {
-      if (!silent) toast.error("Failed to update status");
+      if (!silent) toast.error(status === "replied" ? "Failed to send reply" : "Failed to update status");
     } finally {
       setPendingAction(null);
     }
@@ -246,6 +246,7 @@ export default function EnquiriesPage() {
           deletingId={pendingAction?.action === "delete" ? pendingAction.id : null}
           onSelect={handleSelect}
           onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
         />
 
         {/* Pagination UI */}

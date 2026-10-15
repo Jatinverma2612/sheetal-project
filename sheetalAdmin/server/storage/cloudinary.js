@@ -82,6 +82,13 @@ export class CloudinaryStorageEngine {
       file.fieldname === "variantVideos" ||
       file.mimetype?.startsWith("video/");
 
+    let isDone = false;
+    const safeCallback = (err, info) => {
+      if (isDone) return;
+      isDone = true;
+      cb(err, info);
+    };
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
@@ -91,10 +98,10 @@ export class CloudinaryStorageEngine {
       (error, result) => {
         if (error) {
           logger.error(`Cloudinary stream upload failed: ${error.message}`);
-          return cb(error);
+          return safeCallback(error);
         }
 
-        cb(null, {
+        safeCallback(null, {
           location: result.secure_url,
           url: result.secure_url,
           path: result.secure_url,
@@ -108,7 +115,21 @@ export class CloudinaryStorageEngine {
       },
     );
 
-    file.stream.pipe(uploadStream);
+    uploadStream.on("error", (err) => {
+      logger.error(`Cloudinary uploadStream error: ${err.message}`);
+      safeCallback(err);
+    });
+
+    if (file.stream) {
+      file.stream.on("error", (err) => {
+        logger.error(`Multer file.stream error: ${err.message}`);
+        uploadStream.destroy();
+        safeCallback(err);
+      });
+      file.stream.pipe(uploadStream);
+    } else {
+      safeCallback(new Error("File stream is missing"));
+    }
   }
 
   _removeFile(req, file, cb) {

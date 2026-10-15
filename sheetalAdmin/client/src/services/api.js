@@ -1,8 +1,8 @@
-// export const BASE_URL = "https://node.sheetal.codenap.in";
-// export const BASE_URL = "https://sheetaladmin.onrender.com";
-// export const BASE_URL = "https://sheetaladmin-2.onrender.com";
-export const BASE_URL = "https://node.projects.codenap.in/mmk";
-// export const BASE_URL = "http://localhost:8000";
+export const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:8000"
+    : "https://node.projects.codenap.in/mmk");
 
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
 

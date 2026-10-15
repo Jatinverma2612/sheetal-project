@@ -20,11 +20,27 @@ export const createBlogService = async (data, files, userId) => {
 
     const bannerImageFile = files?.bannerImage?.[0];
 
-    if (!title || !content || !bannerImageFile) {
+    if (!title || !title.trim()) {
       await cleanupFiles(files);
       return {
         success: false,
-        message: "Title, Content and Banner Image are required",
+        message: "Blog title is required",
+      };
+    }
+
+    if (!content || !content.trim() || content === "<p></p>") {
+      await cleanupFiles(files);
+      return {
+        success: false,
+        message: "Blog content is required",
+      };
+    }
+
+    if (!bannerImageFile) {
+      await cleanupFiles(files);
+      return {
+        success: false,
+        message: "Banner image is required",
       };
     }
 
@@ -53,6 +69,7 @@ export const createBlogService = async (data, files, userId) => {
       slug,
       excerpt,
       author: userId,
+      authorName: data.authorName?.trim() || "Admin",
       bannerImage: {
         url: bannerImageFile.location || bannerImageFile.path,
         public_id: bannerImageFile.key || bannerImageFile.filename,
@@ -99,6 +116,10 @@ export const updateBlogService = async (id, data, files) => {
     }
 
     let updateData = { ...data };
+
+    if (data.authorName !== undefined) {
+      updateData.authorName = data.authorName.trim() || "Admin";
+    }
 
     if (data.slug) {
       updateData.slug = slugify(data.slug, { lower: true, strict: true });
@@ -207,16 +228,18 @@ export const getAllBlogsService = async (query) => {
       .lean();
 
     const transformedBlogs = blogs.map((blog) => {
-      if (blog.author) {
-        return {
-          ...blog,
-          author: {
-            ...blog.author,
-            name: "Admin",
-          },
-        };
-      }
-      return blog;
+      const resolvedAuthorName =
+        blog.authorName || blog.author?.name || "Admin";
+      return {
+        ...blog,
+        authorName: resolvedAuthorName,
+        author: blog.author
+          ? {
+              ...blog.author,
+              name: resolvedAuthorName,
+            }
+          : { name: resolvedAuthorName },
+      };
     });
 
     const total = await Blog.countDocuments(filter);
@@ -311,8 +334,13 @@ export const getBlogBySlugService = async (slug, incrementViews = true) => {
     if (!blog) return { success: false, message: "Blog post not found" };
 
     const blogObj = blog.toObject();
+    const resolvedAuthorName =
+      blogObj.authorName || blogObj.author?.name || "Admin";
+    blogObj.authorName = resolvedAuthorName;
     if (blogObj.author) {
-      blogObj.author.name = "Admin";
+      blogObj.author.name = resolvedAuthorName;
+    } else {
+      blogObj.author = { name: resolvedAuthorName };
     }
 
     return { success: true, data: blogObj };

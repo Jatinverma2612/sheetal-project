@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe } from "lucide-react";
+import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe, Mail, Phone, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/admin/layout/PageHeader.js";
 import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon } from "@/services/settingsService";
@@ -23,6 +23,15 @@ export default function SettingsPage() {
     logo: null,
     favicon: "",
     logoHistory: [],
+  });
+
+  const [contactSettings, setContactSettings] = useState({
+    supportEmail: "info@studiobysheetal.com",
+    supportWhatsapp: "919958813913",
+    contactSubtitle: "Please contact us with any questions or concerns.",
+    contactWriteUsTitle: "Write to us:",
+    contactWriteUsSubtitle:
+      "Thank you for visiting us. We'd love to hear from you. Please fill in the details below. Our team member will contact you shortly.",
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +59,19 @@ export default function SettingsPage() {
           favicon: settingsRes.data.favicon || "",
           logoHistory: settingsRes.data.logoHistory || [],
         });
+
+        setContactSettings({
+          supportEmail: settingsRes.data.supportEmail || "info@studiobysheetal.com",
+          supportWhatsapp: settingsRes.data.supportWhatsapp || "919958813913",
+          contactSubtitle:
+            settingsRes.data.contactSubtitle ||
+            "Please contact us with any questions or concerns.",
+          contactWriteUsTitle:
+            settingsRes.data.contactWriteUsTitle || "Write to us:",
+          contactWriteUsSubtitle:
+            settingsRes.data.contactWriteUsSubtitle ||
+            "Thank you for visiting us. We'd love to hear from you. Please fill in the details below. Our team member will contact you shortly.",
+        });
       }
 
       if (showToast) toast.success("Settings loaded");
@@ -73,12 +95,31 @@ export default function SettingsPage() {
     }));
   };
 
+  const handleContactSettingChange = (e) => {
+    const { name, value } = e.target;
+    setContactSettings((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleWhatsappChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 15);
+    setContactSettings((prev) => ({
+      ...prev,
+      supportWhatsapp: digits,
+    }));
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await updateSettings(globalSettings);
+      const res = await updateSettings({
+        ...globalSettings,
+        ...contactSettings,
+      });
       if (res.success) {
-        toast.success("Global settings updated!");
+        toast.success("Settings updated successfully!");
       } else {
         toast.error(res.message || "Failed to update settings");
       }
@@ -407,6 +448,116 @@ export default function SettingsPage() {
                 <p className="text-[10px] text-slate-400">
                   Default HSN code for items where the category does not define one.
                 </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* --- Contact Us & Support Details --- */}
+        <div className="bg-white p-6 md:p-8 rounded-[28px] border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <MessageSquare size={18} className="text-amber-500" /> Contact Us & Support Details
+            </h3>
+          </div>
+
+          {isLoading ? (
+            <div className="flex h-48 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+              <Loader2 size={22} className="animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className={labelStyle}>Support Email</label>
+                  <div className="relative">
+                    <Mail
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      size={16}
+                    />
+                    <input
+                      type="email"
+                      name="supportEmail"
+                      value={contactSettings.supportEmail}
+                      onChange={handleContactSettingChange}
+                      className={`${inputStyle} pl-11`}
+                      placeholder="info@studiobysheetal.com"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Displayed on storefront Contact Us page and footer.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className={labelStyle}>Support Phone / WhatsApp</label>
+                  <div className="relative">
+                    <Phone
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      size={16}
+                    />
+                    <input
+                      type="text"
+                      name="supportWhatsapp"
+                      inputMode="numeric"
+                      value={contactSettings.supportWhatsapp}
+                      onChange={handleWhatsappChange}
+                      className={`${inputStyle} pl-11`}
+                      placeholder="919958813913"
+                      maxLength={15}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Include country code without + (e.g. 919958813913). Up to 15 digits.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={labelStyle}>Get In Touch Subtitle</label>
+                <input
+                  type="text"
+                  name="contactSubtitle"
+                  value={contactSettings.contactSubtitle}
+                  onChange={handleContactSettingChange}
+                  className={inputStyle}
+                  placeholder="Please contact us with any questions or concerns."
+                />
+                <p className="text-[10px] text-slate-400">
+                  Subtitle displayed under &quot;Get In Touch&quot; heading on /contact-us.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-1.5">
+                  <label className={labelStyle}>Write To Us Heading</label>
+                  <input
+                    type="text"
+                    name="contactWriteUsTitle"
+                    value={contactSettings.contactWriteUsTitle}
+                    onChange={handleContactSettingChange}
+                    className={inputStyle}
+                    placeholder="Write to us:"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Heading displayed above the contact enquiry form.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className={labelStyle}>Write To Us Description</label>
+                  <textarea
+                    name="contactWriteUsSubtitle"
+                    rows={3}
+                    value={contactSettings.contactWriteUsSubtitle}
+                    onChange={handleContactSettingChange}
+                    className={inputStyle}
+                    placeholder="Thank you for visiting us. We'd love to hear from you. Please fill in the details below. Our team member will contact you shortly."
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Introductory text displayed below &quot;Write to us:&quot; heading.
+                  </p>
+                </div>
               </div>
             </div>
           )}

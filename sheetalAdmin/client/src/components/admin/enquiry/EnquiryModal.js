@@ -142,8 +142,8 @@ export default function EnquiryModal({
           )}
         </div>
 
-        {/* Reply Section (Contact Only) */}
-        {type === "contact" && isReplying && (
+        {/* Reply Section */}
+        {isReplying && (
           <div className="px-6 pb-4 space-y-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -204,47 +204,43 @@ export default function EnquiryModal({
 
         {/* Actions */}
         <div className="px-6 pb-6 space-y-3">
-          {type === "contact" && (
-            <>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Update Status
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                {["new", "read", "replied"].map((s) => {
-                  const isCurrentStatus = enquiry.status === s;
-                  const isThisButtonSpinning =
-                    isThisEnquiry &&
-                    pendingAction.action === "status" &&
-                    pendingAction.targetStatus === s;
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            Update Status
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {["new", "read", "replied"].map((s) => {
+              const isCurrentStatus = enquiry.status === s;
+              const isThisButtonSpinning =
+                isThisEnquiry &&
+                pendingAction.action === "status" &&
+                pendingAction.targetStatus === s;
 
-                  const label = s === "replied" ? "reply" : s;
+              const label = s === "replied" ? "reply" : s;
 
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => {
-                        if (s === "replied") {
-                          setIsReplying(true);
-                        } else {
-                          onStatusChange(enquiry._id, s);
-                        }
-                      }}
-                      disabled={(isCurrentStatus && s !== "replied") || isAreaLocked}
-                      className={`px-4 cursor-pointer py-2 rounded-xl text-xs font-bold capitalize transition-all border disabled:cursor-not-allowed
-                        ${isCurrentStatus
-                          ? STATUS_STYLES[s] + " opacity-100"
-                          : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-400"
-                        }`}
-                    >
-                      {isThisButtonSpinning ? (
-                        <Loader2 size={12} className="animate-spin inline" />
-                      ) : label}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
+              return (
+                <button
+                  key={s}
+                  onClick={() => {
+                    if (s === "replied") {
+                      setIsReplying(true);
+                    } else {
+                      onStatusChange(enquiry._id, s);
+                    }
+                  }}
+                  disabled={(isCurrentStatus && s !== "replied") || isAreaLocked}
+                  className={`px-4 cursor-pointer py-2 rounded-xl text-xs font-bold capitalize transition-all border disabled:cursor-not-allowed
+                    ${isCurrentStatus
+                      ? STATUS_STYLES[s] + " opacity-100"
+                      : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-400"
+                    }`}
+                >
+                  {isThisButtonSpinning ? (
+                    <Loader2 size={12} className="animate-spin inline" />
+                  ) : label}
+                </button>
+              );
+            })}
+          </div>
 
           <button
             onClick={() => onDelete(enquiry._id)}

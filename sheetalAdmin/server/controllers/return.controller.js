@@ -1,3 +1,4 @@
+import Return from "../models/return.model.js";
 import * as returnService from "../services/return.service.js";
 import successResponse from "../utils/successResponse.js";
 

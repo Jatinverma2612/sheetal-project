@@ -17,6 +17,7 @@ const blogSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    authorName: { type: String, default: "Admin", trim: true },
     bannerImage: {
       url: { type: String, required: true },
       public_id: { type: String },

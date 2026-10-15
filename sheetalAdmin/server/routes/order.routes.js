@@ -3,6 +3,7 @@ import {
   createOrder,
   getMyOrders,
   getSingleOrder,
+  cancelOrder,
   adminGetSingleOrder,
   adminGetAllOrders,
   adminGetOrderStats,
@@ -24,6 +25,9 @@ router.get("/my-orders", isAuthenticated, getMyOrders);
 
 // 3. User: Get single order detail (must own the order)
 router.get("/:id", isAuthenticated, getSingleOrder);
+
+// 4. User: Cancel order
+router.put("/:id/cancel", isAuthenticated, cancelOrder);
 
 // --- ADMIN ROUTES ---
 // Admin: Server-side order stats (replaces client-side 1000-order fetch)

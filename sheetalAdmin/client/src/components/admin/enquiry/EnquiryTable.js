@@ -1,5 +1,6 @@
 import { Loader2, Trash2, MessageSquare } from "lucide-react";
 import StatusBadge from "./StatusBadge";
+import { STATUS_STYLES } from "./enquiryConstants";
 import { formatEnquiryDate } from "@/services/enquiryService";
 
 const TABLE_HEADERS = ["Name", "Product", "Size", "Date", "Status", "Actions"];
@@ -11,6 +12,7 @@ export default function EnquiryTable({
   deletingId,
   onSelect,
   onDelete,
+  onStatusChange,
   type = "notify",
 }) {
   if (isLoading) {
@@ -84,7 +86,29 @@ export default function EnquiryTable({
                 {formatEnquiryDate(e.createdAt)}
               </td>
               <td className="px-5 py-3.5">
-                <StatusBadge status={e.status} />
+                {onStatusChange ? (
+                  <select
+                    value={e.status || "new"}
+                    onChange={(ev) => {
+                      const nextStatus = ev.target.value;
+                      if (nextStatus === "replied") {
+                        onSelect(e);
+                      } else {
+                        onStatusChange(e._id, nextStatus);
+                      }
+                    }}
+                    className={`text-[10px] font-black uppercase tracking-wide rounded-full px-2.5 py-1 border outline-none cursor-pointer transition-colors ${
+                      STATUS_STYLES[e.status?.toLowerCase()] ||
+                      "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    <option value="new" className="bg-white text-slate-700 font-bold">NEW</option>
+                    <option value="read" className="bg-white text-slate-700 font-bold">READ</option>
+                    <option value="replied" className="bg-white text-slate-700 font-bold">REPLIED</option>
+                  </select>
+                ) : (
+                  <StatusBadge status={e.status} />
+                )}
               </td>
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">

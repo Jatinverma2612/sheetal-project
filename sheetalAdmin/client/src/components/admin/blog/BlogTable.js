@@ -126,7 +126,7 @@ function SortableRow({
       </td>
 
       <td className="px-4 py-4 text-slate-600 font-medium">
-        {b.author?.name || "Admin"}
+        {b.authorName || b.author?.name || "Admin"}
       </td>
 
       <td className="px-4 py-4">

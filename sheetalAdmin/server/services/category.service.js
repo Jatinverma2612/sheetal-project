@@ -3,6 +3,7 @@ import Product from "../models/product.model.js";
 import SizeChart from "../models/sizechart.model.js";
 import { generateUniqueGlobalSlug } from "../utils/productSlug.js";
 import { deleteFile, deleteS3File } from "../utils/fileHelper.js";
+import { deleteStorageAsset } from "../storage/index.js";
 import { config } from "../config/config.js";
 import { syncToIndex, deleteFromIndex } from "./ngram.search.service.js";
 import { getGlobalTax } from "./settings.service.js";
@@ -143,21 +144,24 @@ export const createCategoryService = async (data, files) => {
     sizeChart: parsedSizing.sizeChart,
   };
 
-  if (files && files.mainImage) {
+  if (files && files.mainImage && files.mainImage[0]) {
+    const mainImg = files.mainImage[0];
     newCategoryData.mainImage = {
-      url: files.mainImage[0].location || files.mainImage[0].path,
-      public_id: files.mainImage[0].key || files.mainImage[0].filename,
+      url: mainImg.location || mainImg.path || mainImg.url || "",
+      public_id: mainImg.key || mainImg.filename || mainImg.public_id || "",
     };
   }
-  if (files && files.bannerImage) {
+  if (files && files.bannerImage && files.bannerImage[0]) {
+    const bannerImg = files.bannerImage[0];
     newCategoryData.bannerImage = {
-      url: files.bannerImage[0].location || files.bannerImage[0].path,
-      public_id: files.bannerImage[0].key || files.bannerImage[0].filename,
+      url: bannerImg.location || bannerImg.path || bannerImg.url || "",
+      public_id: bannerImg.key || bannerImg.filename || bannerImg.public_id || "",
     };
-    if (files && files.ogImage) {
-      newCategoryData.ogImage =
-        files.ogImage[0].location || files.ogImage[0].path;
-    }
+  }
+  if (files && files.ogImage && files.ogImage[0]) {
+    const ogImg = files.ogImage[0];
+    newCategoryData.ogImage =
+      ogImg.location || ogImg.path || ogImg.url || "";
   }
 
   const newCategory = await Category.create(newCategoryData);
@@ -379,42 +383,40 @@ export const updateCategoryService = async (id, data, files) => {
       data.isFeatured === "true" || data.isFeatured === true;
   }
 
-  if (files && files.mainImage) {
-    if (
-      category.mainImage?.public_id &&
-      !category.mainImage.url.startsWith("http")
-    ) {
-      // Old local file
-      await deleteFile(category.mainImage.url);
-    } else if (category.mainImage?.public_id) {
-      // S3 file
-      await deleteS3File(category.mainImage.public_id);
+  if (files && files.mainImage && files.mainImage[0]) {
+    const oldMainId = category.mainImage?.public_id || "";
+    const oldMainUrl = category.mainImage?.url || "";
+    if (oldMainId || oldMainUrl) {
+      await deleteStorageAsset(oldMainId, oldMainUrl);
     }
 
+    const mainImg = files.mainImage[0];
     updateData.mainImage = {
-      url: files.mainImage[0].location || files.mainImage[0].path,
-      public_id: files.mainImage[0].key || files.mainImage[0].filename,
+      url: mainImg.location || mainImg.path || mainImg.url || "",
+      public_id: mainImg.key || mainImg.filename || mainImg.public_id || "",
     };
   }
 
-  if (files && files.bannerImage) {
-    if (
-      category.bannerImage?.public_id &&
-      !category.bannerImage.url.startsWith("http")
-    ) {
-      await deleteFile(category.bannerImage.url);
-    } else if (category.bannerImage?.public_id) {
-      await deleteS3File(category.bannerImage.public_id);
+  if (files && files.bannerImage && files.bannerImage[0]) {
+    const oldBannerId = category.bannerImage?.public_id || "";
+    const oldBannerUrl = category.bannerImage?.url || "";
+    if (oldBannerId || oldBannerUrl) {
+      await deleteStorageAsset(oldBannerId, oldBannerUrl);
     }
 
+    const bannerImg = files.bannerImage[0];
     updateData.bannerImage = {
-      url: files.bannerImage[0].location || files.bannerImage[0].path,
-      public_id: files.bannerImage[0].key || files.bannerImage[0].filename,
+      url: bannerImg.location || bannerImg.path || bannerImg.url || "",
+      public_id: bannerImg.key || bannerImg.filename || bannerImg.public_id || "",
     };
   }
 
-  if (files && files.ogImage) {
-    updateData.ogImage = files.ogImage[0].location || files.ogImage[0].path;
+  if (files && files.ogImage && files.ogImage[0]) {
+    if (category.ogImage) {
+      await deleteStorageAsset("", category.ogImage);
+    }
+    const ogImg = files.ogImage[0];
+    updateData.ogImage = ogImg.location || ogImg.path || ogImg.url || "";
   } else if (data.existingOgImage) {
     updateData.ogImage = data.existingOgImage;
   }
