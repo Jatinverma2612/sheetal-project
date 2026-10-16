@@ -4,6 +4,7 @@ import Color from "../models/color.model.js";
 import Order from "../models/order.model.js";
 import ProductView from "../models/productView.model.js";
 import Category from "../models/category.model.js";
+import Homepage from "../models/homepage.model.js";
 import { deleteFile, deleteS3File, uploadS3File } from "../utils/fileHelper.js";
 import { deleteStorageAsset } from "../storage/index.js";
 import { config } from "../config/config.js";
@@ -37,6 +38,87 @@ const toTitleCase = (str) => {
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+};
+
+export const syncProductWithHomepageSections = async (
+  productId,
+  { isTrending, isNewArrival, isCollection },
+) => {
+  try {
+    const homepage = await Homepage.findOne();
+    if (!homepage) return;
+
+    let modified = false;
+    const prodIdStr = productId.toString();
+
+    const updateSectionList = (sectionKey, shouldInclude) => {
+      if (!homepage[sectionKey]) {
+        homepage[sectionKey] = { products: [] };
+      }
+      if (!Array.isArray(homepage[sectionKey].products)) {
+        homepage[sectionKey].products = [];
+      }
+
+      const existingIndex = homepage[sectionKey].products.findIndex(
+        (idOrObj) => (idOrObj?._id || idOrObj).toString() === prodIdStr,
+      );
+
+      if (shouldInclude) {
+        if (existingIndex === -1) {
+          homepage[sectionKey].products.unshift(productId);
+          modified = true;
+        }
+      } else {
+        if (existingIndex !== -1) {
+          homepage[sectionKey].products.splice(existingIndex, 1);
+          modified = true;
+        }
+      }
+    };
+
+    if (isTrending !== undefined) {
+      updateSectionList("trendingThisWeek", Boolean(isTrending));
+    }
+    if (isNewArrival !== undefined) {
+      updateSectionList("newArrivals", Boolean(isNewArrival));
+    }
+    if (isCollection !== undefined) {
+      updateSectionList("collections", Boolean(isCollection));
+    }
+
+    if (modified) {
+      await homepage.save();
+    }
+  } catch (err) {
+    console.error("Error syncing product with homepage sections:", err);
+  }
+};
+
+export const removeProductFromHomepageSections = async (productId) => {
+  try {
+    const homepage = await Homepage.findOne();
+    if (!homepage) return;
+    const prodIdStr = productId.toString();
+    let modified = false;
+
+    ["trendingThisWeek", "newArrivals", "collections"].forEach((sectionKey) => {
+      if (homepage[sectionKey] && Array.isArray(homepage[sectionKey].products)) {
+        const initialLen = homepage[sectionKey].products.length;
+        homepage[sectionKey].products = homepage[sectionKey].products.filter(
+          (idOrObj) => (idOrObj?._id || idOrObj).toString() !== prodIdStr,
+        );
+        if (homepage[sectionKey].products.length !== initialLen) {
+          modified = true;
+        }
+      }
+    });
+
+    if (modified) {
+      await homepage.save();
+    }
+  } catch (err) {
+    console.error("Error removing product from homepage sections:", err);
+  }
 };
 
 export const canonicalizeSizeName = (name) => {
@@ -522,12 +604,28 @@ export const getAllProductsService = async (queryStr) => {
       },
     },
     {
+      $addFields: {
+        effectiveSortOrder: {
+          $cond: [
+            { $and: [{ $ne: ["$sortOrder", null] }, { $gt: ["$sortOrder", 0] }] },
+            "$sortOrder",
+            999999999,
+          ],
+        },
+      },
+    },
+    {
       $sort: (() => {
         const searchSort =
           searchProductIds.length > 0 ? { _searchRank: 1 } : {};
 
         const userSort = (() => {
-          if (!sort) return { sortOrder: 1, createdAt: -1 };
+          if (!sort || sort === "sortOrder" || sort === "sortOrder_asc") {
+            return { effectiveSortOrder: 1, createdAt: -1 };
+          }
+          if (sort === "-sortOrder" || sort === "sortOrder_desc") {
+            return { effectiveSortOrder: -1, createdAt: -1 };
+          }
           if (typeof sort === "object") return sort;
           if (sort === "newest") return { createdAt: -1 };
           if (sort === "price_asc") return { "variants.sizes.price": 1 };
@@ -539,7 +637,7 @@ export const getAllProductsService = async (queryStr) => {
 
         return sort === "price_asc" || sort === "price_desc"
           ? { ...searchSort, ...userSort }
-          : { isStarred: -1, sortOrder: 1, ...searchSort, ...userSort };
+          : { isStarred: -1, ...userSort, ...searchSort };
       })(),
     },
   ];
@@ -625,24 +723,7 @@ export const getNewArrivalsService = async () => {
     .populate("variants.colorId")
     .lean();
 
-  let products = flagged.filter(isAvailableForDisplay);
-
-  if (products.length < 10) {
-    const excludeIds = products.map((p) => p._id);
-    const backfill = await Product.find({
-      _id: { $nin: excludeIds },
-      status: "Active",
-      stock: { $gt: 0 },
-    })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .populate("category", "name slug")
-      .populate("variants.colorId")
-      .lean();
-
-    const availableBackfill = backfill.filter(isAvailableForDisplay);
-    products = [...products, ...availableBackfill].slice(0, 10);
-  }
+  const products = flagged.filter(isAvailableForDisplay);
 
   return { success: true, products: products.map(sanitizeProductRecord) };
 };
@@ -710,6 +791,10 @@ export const createProductService = async (data, files, userId) => {
     isTrending: data.isTrending === "true" || data.isTrending === true,
     isNewArrival: data.isNewArrival === "true" || data.isNewArrival === true,
     isCollection: data.isCollection === "true" || data.isCollection === true,
+    sortOrder:
+      data.sortOrder !== undefined && data.sortOrder !== ""
+        ? Number(data.sortOrder) || 0
+        : 0,
     variants:
       typeof data.variants === "string"
         ? JSON.parse(data.variants)
@@ -901,6 +986,12 @@ export const createProductService = async (data, files, userId) => {
   await syncToIndex(product, "product");
   await product.populate("variants.colorId");
 
+  await syncProductWithHomepageSections(product._id, {
+    isTrending: parsedData.isTrending,
+    isNewArrival: parsedData.isNewArrival,
+    isCollection: parsedData.isCollection,
+  });
+
   return { success: true, product: sanitizeProductRecord(product) };
 };
 
@@ -914,6 +1005,10 @@ export const updateProductService = async (id, data, files) => {
     isTrending: data.isTrending === "true" || data.isTrending === true,
     isNewArrival: data.isNewArrival === "true" || data.isNewArrival === true,
     isCollection: data.isCollection === "true" || data.isCollection === true,
+    sortOrder:
+      data.sortOrder !== undefined && data.sortOrder !== ""
+        ? Number(data.sortOrder) || 0
+        : (product.sortOrder || 0),
     variants:
       typeof data.variants === "string"
         ? JSON.parse(data.variants)
@@ -1159,6 +1254,12 @@ export const updateProductService = async (id, data, files) => {
 
   await syncToIndex(updatedProduct, "product");
 
+  await syncProductWithHomepageSections(updatedProduct._id, {
+    isTrending: parsedData.isTrending,
+    isNewArrival: parsedData.isNewArrival,
+    isCollection: parsedData.isCollection,
+  });
+
   try {
     const previousSizes = new Map();
     if (product.variants && Array.isArray(product.variants)) {
@@ -1278,6 +1379,8 @@ export const deleteProductService = async (id) => {
   await product.deleteOne();
 
   await deleteFromIndex(id);
+
+  await removeProductFromHomepageSections(id);
 
   return { success: true };
 };

@@ -153,8 +153,24 @@ function SortableProductRow({
         </td>
       )}
 
-      <td className="px-4 py-4 text-slate-500 font-medium text-center">
-        {(currentPage - 1) * rowsPerPage + i + 1}
+      <td className="px-4 py-4 text-center">
+        <div className="flex flex-col items-center justify-center">
+          {product.sortOrder > 0 ? (
+            <span
+              className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
+              title={`Custom Sort Order: #${product.sortOrder}`}
+            >
+              #{product.sortOrder}
+            </span>
+          ) : (
+            <span
+              className="text-xs text-slate-400 font-medium"
+              title={`Row: ${(currentPage - 1) * rowsPerPage + i + 1} (Unranked)`}
+            >
+              {(currentPage - 1) * rowsPerPage + i + 1}
+            </span>
+          )}
+        </div>
       </td>
 
       <td className="px-4 py-4">
@@ -308,8 +324,8 @@ export default function ProductTable({ refreshStats }) {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({
-    key: "createdAt",
-    direction: "desc",
+    key: "sortOrder",
+    direction: "asc",
   });
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -350,8 +366,14 @@ export default function ProductTable({ refreshStats }) {
       try {
         const orderedIds = newOrder.map((p) => p._id);
         const res = await reorderProducts(orderedIds);
-        if (res.success) toast.success("Order saved!");
-        else toast.error("Failed to save product order. Please try again.");
+        if (res.success) {
+          toast.success("Order saved!");
+          setSortConfig({ key: "sortOrder", direction: "asc" });
+          fetchProducts();
+        } else {
+          toast.error("Failed to save product order. Please try again.");
+          fetchProducts(); // Revert
+        }
       } catch (err) {
         toast.error("Failed to save product order. Please try again.");
         fetchProducts(); // Revert
@@ -423,10 +445,14 @@ export default function ProductTable({ refreshStats }) {
     try {
       // Always sort starred products first, then apply the user's chosen sort as secondary.
       // This ensures starred products appear at the top across ALL pages, not just the current one.
-      const secondarySort =
-        sortConfig.direction === "desc" ? `-${sortConfig.key}` : sortConfig.key;
       const sortParam =
-        sortConfig.direction === "desc" ? `-${sortConfig.key}` : sortConfig.key;
+        sortConfig.key === "sortOrder"
+          ? sortConfig.direction === "desc"
+            ? "-sortOrder"
+            : "sortOrder"
+          : sortConfig.direction === "desc"
+            ? `-${sortConfig.key}`
+            : sortConfig.key;
 
       const res = await getProducts(
         currentPage,
@@ -716,10 +742,12 @@ export default function ProductTable({ refreshStats }) {
             }}
             className="min-w-[180px] border border-slate-300 rounded px-3 py-2 text-sm bg-white text-slate-700 focus:ring-2 focus:ring-slate-200 outline-none"
           >
-            <option value="name_asc">Name: A → Z</option>
-            <option value="name_desc">Name: Z → A</option>
+            <option value="sortOrder_asc">Sort Order (Custom)</option>
+            <option value="sortOrder_desc">Sort Order (Reverse)</option>
             <option value="createdAt_desc">Date: Newest First</option>
             <option value="createdAt_asc">Date: Oldest First</option>
+            <option value="name_asc">Name: A → Z</option>
+            <option value="name_desc">Name: Z → A</option>
           </select>
 
           <button
@@ -798,7 +826,20 @@ export default function ProductTable({ refreshStats }) {
                   </th>
                 )}
                 <th className="px-4 py-4 w-12 text-center"></th>
-                <th className="px-4 py-4 w-12 text-center">#</th>
+                <th
+                  className="px-4 py-4 w-16 text-center cursor-pointer hover:text-slate-900 select-none"
+                  onClick={() => handleSort("sortOrder")}
+                  title="Click to sort by Custom Sort Order"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Order</span>
+                    {sortConfig.key === "sortOrder" && (
+                      <span className="text-[10px] text-indigo-600 font-black">
+                        {sortConfig.direction === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="px-4 py-4 w-16 text-center">Image</th>
                 <th className="px-4 py-4">Product Details</th>
                 <th className="px-4 py-4">Tags</th>

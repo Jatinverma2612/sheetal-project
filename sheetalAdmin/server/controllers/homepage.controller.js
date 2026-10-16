@@ -1,4 +1,5 @@
 import Homepage from "../models/homepage.model.js";
+import Product from "../models/product.model.js";
 import * as productService from "../services/product.service.js";
 import Category from "../models/category.model.js";
 import SeoSettings from "../models/seosettings.model.js";
@@ -37,35 +38,9 @@ const initializeHomepageIfEmpty = async (homepage) => {
     updated = true;
   }
 
-  // Initialize Collections products if empty
-  if (!homepage.collections?.products?.length) {
-    const products = await productService.fetchCollectionProducts();
-    homepage.collections = {
-      ...homepage.collections,
-      products: products.slice(0, 10).map((p) => p._id),
-    };
-    updated = true;
-  }
-
-  // Initialize Trending products if empty
-  if (!homepage.trendingThisWeek?.products?.length) {
-    const { products } = await productService.getTrendingProductsService();
-    homepage.trendingThisWeek = {
-      ...homepage.trendingThisWeek,
-      products: products.slice(0, 10).map((p) => p._id),
-    };
-    updated = true;
-  }
-
-  // Initialize New Arrivals products if empty
-  if (!homepage.newArrivals?.products?.length) {
-    const { products } = await productService.getNewArrivalsService();
-    homepage.newArrivals = {
-      ...homepage.newArrivals,
-      products: products.slice(0, 10).map((p) => p._id),
-    };
-    updated = true;
-  }
+  // NOTE: Do not forcefully seed random products into collections, trendingThisWeek, or newArrivals!
+  // Products in these sections must only be products the admin explicitly pushed via the
+  // "Push for Collection", "Push for Trending", or "Push for New Arrivals" switches.
 
   if (updated) {
     await homepage.save();
@@ -94,47 +69,21 @@ export const getSections = async (req, res, next) => {
       })
       .populate({
         path: "collections.products",
-        select: "name slug mainImage hoverImage variants price stock status category averageRating",
+        select: "name slug mainImage hoverImage variants price stock status category averageRating isCollection sortOrder createdAt",
       })
       .populate({
         path: "trendingThisWeek.products",
-        select: "name slug mainImage hoverImage variants price stock status category averageRating",
+        select: "name slug mainImage hoverImage variants price stock status category averageRating isTrending sortOrder createdAt",
       })
       .populate({
         path: "newArrivals.products",
-        select: "name slug mainImage hoverImage variants price stock status category averageRating",
+        select: "name slug mainImage hoverImage variants price stock status category averageRating isNewArrival sortOrder createdAt",
       });
 
     const isAvailableProductForPublic = (p) => {
       if (!p || !p._id || !p.slug || !p.name) return false;
       if (p.status !== "Active" || p.isActive === false) return false;
-
-      const hasVariantSizes = p.variants?.some(
-        (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
-      );
-      const hasInStockVariant = p.variants?.some((v) =>
-        v.sizes?.some((s) => Number(s.stock || 0) > 0),
-      );
-      const isInStock = hasVariantSizes
-        ? Boolean(hasInStockVariant) && (p.stock === undefined || p.stock > 0)
-        : Number(p.stock || 0) > 0;
-
-      if (!isInStock) return false;
-
-      let minPrice = Infinity;
-      p.variants?.forEach((v) => {
-        v.sizes?.forEach((s) => {
-          const eff =
-            s.discountPrice && s.discountPrice > 0 ? s.discountPrice : s.price;
-          if (eff > 0 && eff < minPrice) minPrice = eff;
-        });
-      });
-
-      if (minPrice === Infinity && Number(p.price || 0) > 0) {
-        minPrice = Number(p.price);
-      }
-
-      return minPrice > 0 && minPrice !== Infinity;
+      return true;
     };
 
     const collectionsObj =
@@ -146,21 +95,64 @@ export const getSections = async (req, res, next) => {
     const newArrivalsObj =
       homepage.newArrivals?.toObject?.() || homepage.newArrivals || {};
 
-    const filteredCollections = {
-      ...collectionsObj,
-      products: (collectionsObj.products || []).filter(
-        isAvailableProductForPublic,
-      ),
+    // Get all products from DB currently flagged for each section to ensure 100% accurate sync
+    const [flaggedTrending, flaggedNewArrivals, flaggedCollections] = await Promise.all([
+      Product.find({ isTrending: true, status: "Active" })
+        .select("name slug mainImage hoverImage variants price stock status category averageRating isTrending sortOrder createdAt")
+        .populate("category", "name slug")
+        .lean(),
+      Product.find({ isNewArrival: true, status: "Active" })
+        .select("name slug mainImage hoverImage variants price stock status category averageRating isNewArrival sortOrder createdAt")
+        .populate("category", "name slug")
+        .lean(),
+      Product.find({ isCollection: true, status: "Active" })
+        .select("name slug mainImage hoverImage variants price stock status category averageRating isCollection sortOrder createdAt")
+        .populate("category", "name slug")
+        .lean(),
+    ]);
+
+    // Build section list: only include products that currently have the flag = true
+    const buildSectionProducts = (curatedProducts, flaggedList) => {
+      const flaggedMap = new Map(flaggedList.map((p) => [p._id.toString(), p]));
+      const result = [];
+      const seenIds = new Set();
+
+      // First add curated products that still have the flag = true and are in stock/active
+      (curatedProducts || []).forEach((p) => {
+        if (!p) return;
+        const pId = (p._id || p).toString();
+        const flaggedItem = flaggedMap.get(pId);
+        if (flaggedItem && isAvailableProductForPublic(flaggedItem)) {
+          result.push(flaggedItem);
+          seenIds.add(pId);
+        }
+      });
+
+      // Then add any newly flagged products not yet in curated list
+      flaggedList.forEach((p) => {
+        const pId = p._id.toString();
+        if (!seenIds.has(pId) && isAvailableProductForPublic(p)) {
+          result.push(p);
+          seenIds.add(pId);
+        }
+      });
+
+      return result;
     };
+
     const filteredTrending = {
       ...trendingObj,
-      products: (trendingObj.products || []).filter(isAvailableProductForPublic),
+      products: buildSectionProducts(trendingObj.products, flaggedTrending),
     };
+
     const filteredNewArrivals = {
       ...newArrivalsObj,
-      products: (newArrivalsObj.products || []).filter(
-        isAvailableProductForPublic,
-      ),
+      products: buildSectionProducts(newArrivalsObj.products, flaggedNewArrivals),
+    };
+
+    const filteredCollections = {
+      ...collectionsObj,
+      products: buildSectionProducts(collectionsObj.products, flaggedCollections),
     };
 
     res.status(200).json({

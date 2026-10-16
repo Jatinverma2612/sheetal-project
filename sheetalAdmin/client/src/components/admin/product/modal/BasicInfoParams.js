@@ -106,7 +106,7 @@ export default function BasicInfoParams({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <InputField
           label="SKU Code"
           name="sku"
@@ -115,6 +115,24 @@ export default function BasicInfoParams({
           placeholder="CLOTH-001"
           required
         />
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center justify-between">
+            <span>Sort Order</span>
+            <span className="text-[10px] font-normal text-slate-400 normal-case tracking-normal">
+              (Lower numbers appear first, e.g. 1, 2, 3...)
+            </span>
+          </label>
+          <input
+            type="number"
+            name="sortOrder"
+            value={formData.sortOrder !== undefined && formData.sortOrder !== null ? formData.sortOrder : ""}
+            onChange={handleChange}
+            min={0}
+            className="w-full bg-white border border-slate-400 px-4 py-2.5 rounded-lg text-sm text-slate-900 focus:border-slate-900 outline-none shadow-sm"
+            placeholder="e.g. 1 (Leave 0 or empty for default)"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-5">
