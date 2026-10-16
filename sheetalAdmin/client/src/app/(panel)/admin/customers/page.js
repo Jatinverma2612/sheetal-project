@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import CustomerTable from "@/components/admin/customer/CustomerTable";
 import AdminStatCard from "@/components/admin/common/AdminStatCard";
 import DateRangeControl from "@/components/admin/common/DateRangeControl";
