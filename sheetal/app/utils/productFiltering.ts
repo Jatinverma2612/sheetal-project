@@ -92,3 +92,23 @@ export const applyFilters = (
 
   return filtered;
 };
+
+export const isProductInStock = (p: Product | null | undefined): boolean => {
+  if (!p || !p._id || !p.name || !p.slug) return false;
+  if (p.status && p.status !== "Active") return false;
+  if ((p as any).isActive === false) return false;
+
+  const hasVariantSizes = p.variants?.some(
+    (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+  );
+
+  if (hasVariantSizes) {
+    const hasVariantStock = p.variants?.some((v) =>
+      v.sizes?.some((s) => Number(s.stock || 0) > 0),
+    );
+    const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+    return Boolean(hasVariantStock && hasOverallStock);
+  }
+
+  return Number(p.stock || 0) > 0;
+};

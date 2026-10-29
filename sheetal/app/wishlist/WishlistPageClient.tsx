@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import WishlistContent from "./components/WishlistContent";
 import { isAuthenticated } from "../services/authService";
@@ -8,16 +8,21 @@ import StorefrontLoadingShell from "../components/StorefrontLoadingShell";
 
 const WishlistPage = () => {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const isLoggedIn = isAuthenticated();
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isLoggedIn) {
       redirectToLogin(router, "/wishlist");
     }
-  }, [router, isLoggedIn]);
+  }, [mounted, router, isLoggedIn]);
 
-  if (!isLoggedIn) {
-    return <StorefrontLoadingShell message="Redirecting to login..." />;
+  if (!mounted || !isLoggedIn) {
+    return <StorefrontLoadingShell message={!mounted ? "Loading wishlist..." : "Redirecting to login..."} />;
   }
 
   return (

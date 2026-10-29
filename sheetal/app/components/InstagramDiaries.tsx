@@ -18,11 +18,11 @@ const MIN_FOR_CAROUSEL_MOBILE = 2;
 const INSTAGRAM_URL = "https://www.instagram.com/";
 
 const fallbackImages = [
-  "/assets/i1.webp",
-  "/assets/i2.webp",
-  "/assets/i3.webp",
-  "/assets/i4.webp",
-  "/assets/i5.webp",
+  "/assets/images/product-placeholder.webp",
+  "/assets/images/product-placeholder.webp",
+  "/assets/images/product-placeholder.webp",
+  "/assets/images/product-placeholder.webp",
+  "/assets/images/product-placeholder.webp",
 ];
 
 interface InstaCard {
@@ -40,6 +40,7 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
   const [cards, setCards] = useState<InstaCard[]>(
     fallbackImages.map((url) => ({ url, link: INSTAGRAM_URL, alt: null })),
   );
+  const [loading, setLoading] = useState(true);
   const [isCarousel, setIsCarousel] = useState(false);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -77,23 +78,56 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
         });
 
         if (response.success && response.products?.length > 0) {
-          setCards(
-            response.products.map((product: Product) => ({
-              url: getProductImageUrl(product),
-              link: INSTAGRAM_URL,
-              alt: product.mainImage?.alt || product.name,
-            })),
-          );
+          const inStockProducts = response.products.filter((p: Product) => {
+            if (!p || p.status !== "Active") return false;
+            const hasVariantSizes = p.variants?.some(
+              (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+            );
+            if (hasVariantSizes) {
+              const hasVariantStock = p.variants.some((v) =>
+                v.sizes?.some((s) => Number(s.stock || 0) > 0),
+              );
+              const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+              return hasVariantStock && hasOverallStock;
+            }
+            return (p.stock ?? 0) > 0;
+          });
+
+          if (inStockProducts.length > 0) {
+            setCards(
+              inStockProducts.map((product: Product) => ({
+                url: getProductImageUrl(product),
+                link: INSTAGRAM_URL,
+                alt: product.mainImage?.alt || product.name,
+              })),
+            );
+          }
         }
       } catch (error) {
         console.error(
           "Error fetching latest products for Instagram Diaries:",
           error,
         );
+      } finally {
+        setLoading(false);
       }
     };
     fetchLatestProducts();
   }, []);
+
+  const SkeletonCard = ({ index }: { index: number }) => (
+    <div className="relative overflow-hidden rounded-xl shadow-md aspect-[3/4] bg-[#fbf9f6] border border-[#f0ece4] flex flex-col items-center justify-center p-6 animate-pulse">
+      <div className="relative w-20 h-28 opacity-80">
+        <Image
+          src="/assets/335014072.png"
+          alt="Studio By Sheetal"
+          fill
+          className="object-contain"
+        />
+      </div>
+      <div className="mt-4 h-2 w-16 bg-[#e8decf] rounded-full opacity-60" />
+    </div>
+  );
 
   const CardItem = ({ card, index }: { card: InstaCard; index: number }) => (
     <a href={card.link} target="_blank" rel="noreferrer">
@@ -144,8 +178,19 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
           </p>
         </div>
 
-        {/* CAROUSEL */}
-        {isCarousel ? (
+        {/* LOADER SKELETON */}
+        {loading ? (
+          <div className="flex flex-wrap gap-4 md:gap-8 justify-center">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={index}
+                className="w-[85%] sm:w-[45%] md:w-[30%] lg:w-[18%]"
+              >
+                <SkeletonCard index={index} />
+              </div>
+            ))}
+          </div>
+        ) : isCarousel ? (
           <div className="relative group/slider">
             <div ref={emblaRef} className="overflow-hidden">
               <div className="flex gap-3 px-2 sm:px-3 md:gap-8 md:px-4">

@@ -215,14 +215,10 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
       <div className="mb-5">
         <span
           className={`inline-block text-xs px-2 py-1 text-[15px] rounded ${
-            isUnavailable ? "text-red-700 bg-red-50" : "text-green-700 bg-green-50"
+            isOutOfStock ? "text-red-700 bg-red-50" : "text-green-700 bg-green-50"
           }`}
         >
-          {priceToDisplay <= 0
-            ? "Unavailable"
-            : isOutOfStock
-              ? "Out of Stock"
-              : "In Stock"}
+          {isOutOfStock ? "Out of Stock" : "In Stock"}
         </span>
       </div>
 

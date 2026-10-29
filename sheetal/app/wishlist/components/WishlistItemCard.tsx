@@ -10,6 +10,7 @@ interface WishlistItemCardProps {
     lowestPrice: number;
     lowestMrp: number;
     discountPercent: number;
+    totalStock?: number;
   };
   onRemove: (productId: string) => void;
   onMoveToCart: (product: Product) => void;
@@ -23,12 +24,16 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
   isMovingToCart = false,
 }) => {
   const productHref = buildProductHref(product);
-  const similarHref = buildProductHref(product, { scroll: "similar" });
+  const effectiveStock =
+    typeof product.totalStock === "number"
+      ? product.totalStock
+      : (Number(product.stock) || 0);
+  const isOutOfStock = effectiveStock < 1;
 
   return (
     <div className="group p-2 flex flex-col">
       <div className="relative overflow-hidden bg-[#f7f7f7] rounded-lg">
-        {product.stock < 1 && (
+        {isOutOfStock && (
           <div className="absolute -top-1 left-0 z-20">
             <span className="bg-red-600 text-white text-[10px] px-2 py-1 uppercase font-bold tracking-wider rounded-br-lg">
               SOLD OUT
@@ -102,7 +107,7 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           )}
         </div>
         <div className="mt-auto">
-          {product.stock > 0 && product.lowestPrice > 0 ? (
+          {!isOutOfStock && product.lowestPrice > 0 ? (
             <button
               disabled={isMovingToCart}
               onClick={() => onMoveToCart(product)}
@@ -112,10 +117,10 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
             </button>
           ) : (
             <Link
-              href={similarHref}
-              className="cursor-pointer inline-block text-left text-[12px] border-b border-black text-black font-normal py-2 pr-6 uppercase transition-all duration-500 hover:text-red-600 hover:tracking-[1px]"
+              href={productHref}
+              className="cursor-pointer inline-block text-left text-[12px] border-b border-black text-black font-normal py-2 pr-6 uppercase transition-all duration-500 hover:text-[#bd9951] hover:tracking-[1px]"
             >
-              Show Similar
+              View Details
             </Link>
           )}
         </div>

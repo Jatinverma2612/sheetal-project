@@ -29,6 +29,7 @@ interface OrderItem {
     price: number;
     quantity: number;
     isReviewed?: boolean;
+    itemStatus?: OrderStatus;
     review?: {
         rating: number;
         comment: string;
@@ -45,6 +46,8 @@ interface RawOrder {
     itemsPrice: number;
     shippingPrice: number;
     taxPrice: number;
+    discountPrice?: number;
+    couponCode?: string;
     paymentInfo: { id?: string; status?: string; method: "COD" | "Online" };
     shippingAddress: {
         fullName: string;
@@ -606,7 +609,19 @@ const OrderDetailPage = () => {
             </div>
 
             {/* ── Per-item sections ── */}
-            {order.orderItems.map((item) => (
+            {order.orderItems.map((item) => {
+                const itemEffectiveStatus = normalizeOrderStatus(
+                    order.orderStatus === "Cancelled"
+                        ? "Cancelled"
+                        : item.itemStatus || order.orderStatus
+                );
+                const isItemCancelled =
+                    itemEffectiveStatus === "Cancelled" ||
+                    itemEffectiveStatus === "Returned" ||
+                    itemEffectiveStatus === "Exchanged" ||
+                    itemEffectiveStatus === "Return Requested";
+
+                return (
                 <div key={item._id} className="mb-6">
 
                     {/* Product summary */}
@@ -651,44 +666,44 @@ const OrderDetailPage = () => {
                         <div className="flex items-start justify-between mb-1">
                             <div>
                                 <p className="text-sm font-bold text-gray-900">
-                                    {STATUS_LABEL[normalizedStatus]}
+                                    {STATUS_LABEL[itemEffectiveStatus]}
                                 </p>
-                                {!isCancelled && (
+                                {!isItemCancelled && (
                                     <p className="text-xs text-gray-500 mt-0.5">
-                                        {normalizedStatus === "Delivered"
+                                        {itemEffectiveStatus === "Delivered"
                                             ? "Your order has been delivered."
-                                            : `Your order is ${STATUS_LABEL[normalizedStatus].toLowerCase()}.`}
+                                            : `Your order is ${STATUS_LABEL[itemEffectiveStatus].toLowerCase()}.`}
                                     </p>
                                 )}
-                                {isCancelled && (
+                                {isItemCancelled && (
                                     <p className="text-xs text-red-500 mt-0.5">
-                                        Order {STATUS_LABEL[normalizedStatus]}.
+                                        {itemEffectiveStatus === "Cancelled" ? "Item Cancelled." : `Order ${STATUS_LABEL[itemEffectiveStatus]}.`}
                                     </p>
                                 )}
                             </div>
-                            {!isCancelled && normalizedStatus !== "Processing" && (
+                            {!isItemCancelled && itemEffectiveStatus !== "Processing" && (
                                 <span className="text-[11px] font-semibold px-2 py-0.5 bg-green-50 text-green-700 rounded-full shrink-0 ml-2">
                                     On Time
                                 </span>
                             )}
-                            {isCancelled && (
+                            {isItemCancelled && (
                                 <span className="text-[11px] font-semibold px-2 py-0.5 bg-red-50 text-red-600 rounded-full shrink-0 ml-2">
-                                    {STATUS_LABEL[normalizedStatus]}
+                                    {STATUS_LABEL[itemEffectiveStatus]}
                                 </span>
                             )}
                         </div>
 
                         {/* Progress track */}
-                        {!isCancelled && (
+                        {!isItemCancelled && (
                             <OrderProgress
-                                status={normalizedStatus}
+                                status={itemEffectiveStatus}
                                 placedAt={order.createdAt}
                                 deliveredAt={order.deliveredAt}
                             />
                         )}
 
                         {/* Tracking number */}
-                        {(order.trackingId || order.awbCode) && (
+                        {!isItemCancelled && (order.trackingId || order.awbCode) && (
                             <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                     <circle cx="12" cy="12" r="10" />
@@ -705,7 +720,7 @@ const OrderDetailPage = () => {
                         )}
 
                         {/* Info note */}
-                        {!isCancelled && (
+                        {!isItemCancelled && (
                             <div className="mt-3 flex items-start gap-2 text-xs text-gray-500 bg-gray-50 rounded px-3 py-2 border border-gray-100">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5">
                                     <circle cx="12" cy="12" r="10" />
@@ -717,7 +732,7 @@ const OrderDetailPage = () => {
                         )}
 
                         {/* See all updates */}
-                        {!isCancelled && (
+                        {!isItemCancelled && (
                             <div className="mt-3 text-center">
                                 <button
                                     onClick={() => setShowTracking((v) => !v)}
@@ -729,7 +744,7 @@ const OrderDetailPage = () => {
                         )}
 
                         {/* Expanded tracking timeline */}
-                        {showTracking && !isCancelled && <TrackingTimeline order={order} />}
+                        {showTracking && !isItemCancelled && <TrackingTimeline order={order} />}
                     </div>
 
                     {/* Chat with us */}
@@ -752,7 +767,7 @@ const OrderDetailPage = () => {
                     </div>
 
                     {/* Action buttons row */}
-                    {normalizedStatus === "Delivered" && (
+                    {itemEffectiveStatus === "Delivered" && (
                         <div className="flex items-center gap-3 mt-4">
                             <button
                                 onClick={() => !item.isReviewed && setReviewItem(item)}
@@ -804,7 +819,8 @@ const OrderDetailPage = () => {
                         </div>
                     )}
                 </div>
-            ))}
+                );
+            })}
 
             {/* ── Delivery Details card ── */}
             <div className="border border-gray-200 rounded-xl mb-4 overflow-hidden">
@@ -855,6 +871,14 @@ const OrderDetailPage = () => {
                             <span>Listing Price</span>
                             <span>₹{order.itemsPrice.toLocaleString("en-IN")}</span>
                         </div>
+                        {order.discountPrice != null && order.discountPrice > 0 && (
+                            <div className="flex justify-between items-center py-2.5 text-sm text-green-600 font-medium">
+                                <span>
+                                    Discount{order.couponCode ? ` (${order.couponCode})` : ""}
+                                </span>
+                                <span>-₹{order.discountPrice.toLocaleString("en-IN")}</span>
+                            </div>
+                        )}
                         {order.shippingPrice > 0 && (
                             <div className="flex justify-between items-center py-2.5 text-sm text-gray-600">
                                 <span>Shipping Charges</span>

@@ -116,6 +116,14 @@ export const orderConfirmationTemplate = (data) => {
                                   <td style="border:1px solid #ddd;font-size:14px;">Subtotal:</td>
                                   <td colspan="3" style="border:1px solid #ddd;font-size:14px;text-align:right;">${data.subtotal}</td>
                                 </tr>
+                                ${
+                                  data.discount
+                                    ? `<tr>
+                                  <td style="border:1px solid #ddd;font-size:14px;color:#16a34a;">Discount${data.couponCode ? ` (${escapeHtml(data.couponCode)})` : ""}:</td>
+                                  <td colspan="3" style="border:1px solid #ddd;font-size:14px;text-align:right;color:#16a34a;">-${data.discount}</td>
+                                </tr>`
+                                    : ""
+                                }
                                 <tr>
                                   <td style="border:1px solid #ddd;font-size:14px;">Shipping:</td>
                                   <td colspan="3" style="border:1px solid #ddd;font-size:14px;text-align:right;">${data.shipping}</td>
@@ -187,6 +195,9 @@ export const sendOrderConfirmationEmail = async ({ order, user }) => {
       orderStatus: order.orderStatus || "Processing",
       items,
       subtotal: formatCurrency(order.itemsPrice || 0),
+      discount:
+        order.discountPrice > 0 ? formatCurrency(order.discountPrice) : null,
+      couponCode: order.couponCode || "",
       shipping:
         order.shippingPrice > 0 ? formatCurrency(order.shippingPrice) : "FREE",
       total: formatCurrency(order.totalPrice || 0),

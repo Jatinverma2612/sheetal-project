@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { X } from "lucide-react";
 
 interface DeleteConfirmationModalProps {
   onConfirm: () => Promise<void>;
@@ -43,10 +44,21 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
     >
       {/* Modal box */}
       <div
-        className="bg-white px-6 py-4 rounded-xl shadow-2xl w-full max-w-md mx-4 font-montserrat font-optima"
+        className="relative bg-white px-6 py-4 rounded-xl shadow-2xl w-full max-w-md mx-4 font-montserrat font-optima"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold text-gray-800 mb-3">
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer p-1 rounded-full hover:bg-gray-100 disabled:opacity-50"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+
+        <h2 className="text-lg font-bold text-gray-800 mb-3 pr-6">
           {isWishlistMode
             ? `Move ${itemCount} Item${itemCount !== 1 ? "s" : ""} to Wishlist`
             : isBulkAction

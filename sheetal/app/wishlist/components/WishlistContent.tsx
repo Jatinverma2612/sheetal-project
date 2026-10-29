@@ -148,8 +148,25 @@ const WishlistContent = () => {
         ? Math.round(((lowestMrp - lowestPrice) / lowestMrp) * 100)
         : 0;
 
+    const variantTotalStock = p.variants?.reduce(
+      (sum, v) =>
+        sum +
+        (v.sizes?.reduce(
+          (sSum, s) => sSum + (Number(s.stock) || 0),
+          0,
+        ) || 0),
+      0,
+    );
+
+    const totalStock =
+      typeof variantTotalStock === "number" && p.variants && p.variants.length > 0
+        ? variantTotalStock
+        : (Number(p.stock) || 0);
+
     return {
       ...p,
+      stock: totalStock,
+      totalStock,
       lowestPrice,
       lowestMrp,
       discountPercent,

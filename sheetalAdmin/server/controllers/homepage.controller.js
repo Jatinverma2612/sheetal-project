@@ -80,10 +80,25 @@ export const getSections = async (req, res, next) => {
         select: "name slug mainImage hoverImage variants price stock status category averageRating isNewArrival sortOrder createdAt",
       });
 
+    const isProductInStock = (p) => {
+      if (!p) return false;
+      const hasVariantSizes = p.variants?.some(
+        (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+      );
+      if (hasVariantSizes) {
+        const hasVariantStock = p.variants.some((v) =>
+          v.sizes?.some((s) => Number(s.stock || 0) > 0),
+        );
+        const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+        return hasVariantStock && hasOverallStock;
+      }
+      return Number(p.stock || 0) > 0;
+    };
+
     const isAvailableProductForPublic = (p) => {
       if (!p || !p._id || !p.slug || !p.name) return false;
       if (p.status !== "Active" || p.isActive === false) return false;
-      return true;
+      return isProductInStock(p);
     };
 
     const collectionsObj =
@@ -330,9 +345,35 @@ export const getSectionContent = async (req, res, next) => {
 
     homepage = await query;
 
+    let sectionData = homepage[sectionName];
+    if (
+      ["trendingThisWeek", "newArrivals", "collections"].includes(sectionName) &&
+      sectionData?.products
+    ) {
+      const isProductInStock = (p) => {
+        if (!p) return false;
+        const hasVariantSizes = p.variants?.some(
+          (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+        );
+        if (hasVariantSizes) {
+          const hasVariantStock = p.variants.some((v) =>
+            v.sizes?.some((s) => Number(s.stock || 0) > 0),
+          );
+          const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+          return hasVariantStock && hasOverallStock;
+        }
+        return Number(p.stock || 0) > 0;
+      };
+      const rawObj = sectionData.toObject ? sectionData.toObject() : sectionData;
+      rawObj.products = (rawObj.products || []).filter(
+        (p) => p && p.status === "Active" && p.isActive !== false && isProductInStock(p)
+      );
+      sectionData = rawObj;
+    }
+
     res.status(200).json({
       success: true,
-      data: homepage[sectionName],
+      data: sectionData,
     });
   } catch (error) {
     next(error);

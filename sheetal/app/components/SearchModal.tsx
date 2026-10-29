@@ -135,17 +135,22 @@ const SearchModal: React.FC<SearchModalProps> = ({
         fetchProducts({ sort: "-viewCount", limit: 4, status: "Active" })
           .then((prodRes) => {
             if (prodRes.success && prodRes.products) {
+              const isProductInStock = (p: Product) => {
+                if (!p || !p._id || !p.slug || !p.name || p.status !== "Active") return false;
+                const hasVariantSizes = p.variants?.some(
+                  (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+                );
+                if (hasVariantSizes) {
+                  const hasVariantStock = p.variants.some((v) =>
+                    v.sizes?.some((s) => Number(s.stock || 0) > 0),
+                  );
+                  const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+                  return hasVariantStock && hasOverallStock;
+                }
+                return (p.stock ?? 0) > 0;
+              };
               setTrendingProducts(
-                prodRes.products.filter(
-                  (product) =>
-                    Boolean(
-                      product &&
-                        product._id &&
-                        product.slug &&
-                        product.name &&
-                        product.status === "Active",
-                    ),
-                ),
+                prodRes.products.filter(isProductInStock),
               );
             }
           })
@@ -172,15 +177,22 @@ const SearchModal: React.FC<SearchModalProps> = ({
             const productResults = rawResults.filter(
               (r) => r.type === "product",
             );
+            const isProductInStock = (p: any) => {
+              if (!p || !p._id || !p.slug || !p.name || p.status !== "Active") return false;
+              const hasVariantSizes = p.variants?.some(
+                (v: any) => Array.isArray(v.sizes) && v.sizes.length > 0,
+              );
+              if (hasVariantSizes) {
+                const hasVariantStock = p.variants.some((v: any) =>
+                  v.sizes?.some((s: any) => Number(s.stock || 0) > 0),
+                );
+                const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+                return hasVariantStock && hasOverallStock;
+              }
+              return (p.stock ?? 0) > 0;
+            };
             const visibleProductResults = productResults.filter(
-              (r) =>
-                Boolean(
-                  r.data &&
-                    r.data._id &&
-                    r.data.slug &&
-                    r.data.name &&
-                    r.data.status === "Active",
-                ),
+              (r) => r.data && isProductInStock(r.data),
             );
 
             if (visibleProductResults.length === 0) {
@@ -202,16 +214,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
             if (fullRes.success && fullRes.products?.length) {
               const fullProductMap = new Map<string, Product>(
                 fullRes.products
-                  .filter(
-                    (p: Product) =>
-                      Boolean(p && p._id && p.slug && p.name && p.status === "Active"),
-                  )
+                  .filter(isProductInStock)
                   .map((p: Product) => [p._id, p]),
               );
-              const enrichedProductResults = visibleProductResults.map((r) => ({
-                ...r,
-                data: fullProductMap.get(r.data._id ?? r.data.id) ?? r.data,
-              }));
+              const enrichedProductResults = visibleProductResults
+                .map((r) => ({
+                  ...r,
+                  data: fullProductMap.get(r.data._id ?? r.data.id) ?? r.data,
+                }))
+                .filter((r) => isProductInStock(r.data));
               setResults([...categoryResults, ...enrichedProductResults]);
             } else {
               setResults([...categoryResults, ...visibleProductResults]);

@@ -149,6 +149,7 @@ const normaliseOrder = (raw: RawOrder): UIOrder => ({
     price: item.price,
     quantity: item.quantity,
     isReviewed: !!item.isReviewed,
+    status: normalizeOrderStatus(item.itemStatus || raw.orderStatus),
   })),
 });
 
@@ -777,8 +778,11 @@ interface OrderCardProps {
 }
 
 /** Inline delivery status line shown per item, matching the reference image */
-const DeliveryLine = ({ order }: { order: UIOrder }) => {
-  if (order.status === "Delivered") {
+const DeliveryLine = ({ order, item }: { order: UIOrder; item: UIOrderItem }) => {
+  const effectiveStatus: OrderStatus =
+    order.status === "Cancelled" ? "Cancelled" : item.status || order.status;
+
+  if (effectiveStatus === "Delivered") {
     return (
       <div className="flex items-center gap-2 text-sm mb-3">
         {/* Box icon */}
@@ -796,10 +800,10 @@ const DeliveryLine = ({ order }: { order: UIOrder }) => {
   }
 
   if (
-    order.status === "Cancelled" ||
-    order.status === "Returned" ||
-    order.status === "Exchanged" ||
-    order.status === "Return Requested"
+    effectiveStatus === "Cancelled" ||
+    effectiveStatus === "Returned" ||
+    effectiveStatus === "Exchanged" ||
+    effectiveStatus === "Return Requested"
   ) {
     return (
       <div className="flex items-center gap-2 text-sm mb-3">
@@ -809,7 +813,7 @@ const DeliveryLine = ({ order }: { order: UIOrder }) => {
           <line x1="9" y1="12" x2="15" y2="12" />
         </svg>
         <span className="text-red-500 font-medium">
-          Order {STATUS_CONFIG[order.status].label}
+          {effectiveStatus === "Cancelled" ? "Cancelled" : `Order ${STATUS_CONFIG[effectiveStatus].label}`}
         </span>
       </div>
     );
@@ -818,7 +822,7 @@ const DeliveryLine = ({ order }: { order: UIOrder }) => {
   // Processing or Shipped — show "Delivery expected by ..."
   const expectedDate = order.deliveredAt
     ? fmtDelivery(order.deliveredAt)
-    : order.status === "Shipped"
+    : effectiveStatus === "Shipped"
       ? "in transit"
       : "soon";
 
@@ -826,7 +830,7 @@ const DeliveryLine = ({ order }: { order: UIOrder }) => {
     <div className="flex items-center gap-2 text-sm mb-3">
       {/* Box icon */}
       <svg width="36" height="36" viewBox="0 0 512 512" className="shrink-0" fill="#16a34a">
-        <path d="m506.8125 95.679688-172-94.445313c-2.996094-1.644531-6.628906-1.644531-9.625 0l-64.679688 35.515625c-1.460937.40625-2.824218 1.152344-3.980468 2.183594l-103.339844 56.746094c-3.199219 1.757812-5.1875 5.117187-5.1875 8.765624v20.445313h-115.375c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h115.375v36h-57.332031c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h57.332031v52h-84c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h84v20.449219c0 3.648437 1.988281 7.007812 5.1875 8.765625l172 94.445312c1.5.824219 3.15625 1.234375 4.8125 1.234375s3.3125-.410156 4.8125-1.234375l172-94.445312c3.199219-1.757813 5.1875-5.117188 5.1875-8.765625v-44.78125c0-5.519532-4.476562-10-10-10s-10 4.480468-10 10v38.863281l-152 83.464844v-166.078125l48.339844-26.542969v42.125c0 3.539063 1.867187 6.8125 4.910156 8.609375 1.566406.925781 3.328125 1.390625 5.089844 1.390625 1.65625 0 3.316406-.410156 4.820312-1.238281l36.859375-20.285156c3.191407-1.757813 5.175781-5.113282 5.175781-8.761719v-53.058594l46.804688-25.699219v47.210938c0 5.523437 4.476562 10 10 10s10-4.476563 10-10v-64.113282c0-3.648437-1.988281-7.007812-5.1875-8.765624zm-186.8125 275.207031-152-83.464844v-166.074219l152 83.460938zm10-183.402344-151.222656-83.039063 47.527344-26.097656 151.226562 83.039063zm68.308594-37.507813-151.226563-83.039062 16.394531-9 151.222657 83.039062zm26.886718 44.21875-16.855468 9.277344v-36.1875l16.855468-9.257812zm10.28125-64.628906-151.222656-83.039062 45.746094-25.117188 151.222656 83.035156zm0 0" />
+        <path d="m506.8125 95.679688-172-94.445313c-2.996094-1.644531-6.628906-1.644531-9.625 0l-64.679688 35.515625c-1.460937.40625-2.824218 1.152344-3.980468 2.183594l-103.339844 56.746094c-3.199219 1.757812-5.1875 5.117187-5.1875 8.765624v20.445313h-115.375c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h115.375v36h-57.332031c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h57.332031v52h-84c-5.523438 0-10 4.480469-10 10 0 5.523437 4.476562 10 10 10h84v20.449219c0 3.648437 1.988281 7.007812 5.1875 8.765625l172 94.445312c1.5.824219 3.15625 1.234375 4.8125 1.234375s3.3125-.410156 4.8125-1.234375l172-94.445312c3.199219-1.757813 5.1875-5.117188 5.1875-8.765625v-44.78125c0-5.519532-4.476562-10-10-10s-10 4.480468-10 10v38.863281l-152 83.464844v-166.078125l48.339844-26.542969v42.125c0 3.539063 1.867187 6.8125 4.910156 8.609375 1.566406.925781 3.328125 1.390625 5.089844 1.390625 1.65625 0 3.316406-.410156 4.820312-1.238281l36.859375-20.285156c3.191407-1.757813 5.175781-5.113282 5.175781-8.761719v-53.058594l46.804688-25.699219v47.210938c0 5.523437 4.476562 10 10 10s10-4.476563 10-10v-64.113282c0-3.648437-1.988281-7.007812-5.1875-8.765624zm-186.8125 275.207031-152-83.464844v-166.074219l152 83.460938zm10-183.402344-151.222656-83.039063 47.527344-26.097656 151.222656 83.039063zm68.308594-37.507813-151.226563-83.039062 16.394531-9 151.222657 83.039062zm26.886718 44.21875-16.855468 9.277344v-36.1875l16.855468-9.257812zm10.28125-64.628906-151.222656-83.039062 45.746094-25.117188 151.222656 83.035156zm0 0" />
       </svg>
       <span className="text-gray-700">
         Delivery expected by{" "}
@@ -854,29 +858,41 @@ const OrderCard = ({
     </div>
 
     {/* ── Per-item blocks ── */}
-    {order.items.map((item, idx) => (
-      <div
-        key={item.id}
-        className={`pt-3 pb-2 ${idx < order.items.length - 1 ? "border-b border-gray-100 mb-3" : ""}`}
-      >
-        {(() => {
-          const productHref = item.productId
-            ? buildProductHref({ _id: item.productId })
-            : null;
+    {order.items.map((item, idx) => {
+      const itemEffectiveStatus: OrderStatus =
+        order.status === "Cancelled" ? "Cancelled" : item.status || order.status;
+      const productHref = item.productId
+        ? buildProductHref({ _id: item.productId })
+        : null;
 
-          return (
-            <>
-        {/* Delivery status line */}
-        <DeliveryLine order={order} />
+      return (
+        <div
+          key={item.id}
+          className={`pt-3 pb-2 ${idx < order.items.length - 1 ? "border-b border-gray-100 mb-3" : ""}`}
+        >
+          {/* Delivery status line */}
+          <DeliveryLine order={order} item={item} />
 
-        {/* ── Item card: white bg, rounded border ── */}
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          {/* Top row: thumbnail + info + chevron */}
-          <div className="flex items-center gap-3 p-3 relative">
-            {/* Thumbnail — soft pink bg matching reference */}
-            <div className="w-[68px] h-[80px] shrink-0 relative overflow-hidden rounded-lg bg-[#fce4ec]">
-              {productHref ? (
-                <Link href={productHref} className="block h-full w-full">
+          {/* ── Item card: white bg, rounded border ── */}
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            {/* Top row: thumbnail + info + chevron */}
+            <div className="flex items-center gap-3 p-3 relative">
+              {/* Thumbnail — soft pink bg matching reference */}
+              <div className="w-[68px] h-[80px] shrink-0 relative overflow-hidden rounded-lg bg-[#fce4ec]">
+                {productHref ? (
+                  <Link href={productHref} className="block h-full w-full">
+                    <Image
+                      src={item.image}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "/assets/images/product-placeholder.webp";
+                      }}
+                    />
+                  </Link>
+                ) : (
                   <Image
                     src={item.image}
                     alt={item.name}
@@ -887,124 +903,107 @@ const OrderCard = ({
                         "/assets/images/product-placeholder.webp";
                     }}
                   />
-                </Link>
-              ) : (
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  className="object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "/assets/images/product-placeholder.webp";
-                  }}
-                />
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0 pr-6">
-              {productHref ? (
-                <Link
-                  href={productHref}
-                  className="text-sm text-gray-900 line-clamp-2 leading-snug hover:text-[#bd9951] transition-colors"
-                >
-                  {item.name}
-                </Link>
-              ) : (
-                <p className="text-sm text-gray-900 line-clamp-2 leading-snug">
-                  {item.name}
+              {/* Info */}
+              <div className="flex-1 min-w-0 pr-6">
+                {productHref ? (
+                  <Link
+                    href={productHref}
+                    className="text-sm text-gray-900 line-clamp-2 leading-snug hover:text-[#bd9951] transition-colors"
+                  >
+                    {item.name}
+                  </Link>
+                ) : (
+                  <p className="text-sm text-gray-900 line-clamp-2 leading-snug">
+                    {item.name}
+                  </p>
+                )}
+                <p className="text-xs text-gray-600 mt-1">
+                  <span className="font-semibold text-gray-900">Color:</span>{" "}
+                  {item.color}
+                  {" | "}
+                  <span className="font-semibold text-gray-900">Size:</span>{" "}
+                  {item.size}
                 </p>
-              )}
-              <p className="text-xs text-gray-600 mt-1">
-                <span className="font-semibold text-gray-900">Color:</span>{" "}
-                {item.color}
-                {" | "}
-                <span className="font-semibold text-gray-900">Size:</span>{" "}
-                {item.size}
-              </p>
-            </div>
+              </div>
 
-            {/* Chevron */}
-            <Link
-              href={`/my-account/orders/${order.id}`}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
-              aria-label="View order details"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              {/* Chevron */}
+              <Link
+                href={`/my-account/orders/${order.id}`}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                aria-label="View order details"
               >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </Link>
-          </div>
-
-          {/* Action buttons row — inside the card */}
-          {(order.status === "Processing" || order.status === "Shipped") && (
-            <div className="flex items-center gap-3 px-3 pb-3">
-              <button
-                onClick={onCancel}
-                className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onTrack}
-                className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                {/* Person/location pin icon matching reference image */}
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M20 21a8 8 0 1 0-16 0" />
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m9 18 6-6-6-6" />
                 </svg>
-                Track
-              </button>
+              </Link>
             </div>
-          )}
-          {order.status === "Delivered" && (
-            <div className="flex items-center gap-3 px-3 pb-3">
-              <button
-                onClick={() => !item.isReviewed && onReview(item)}
-                disabled={item.isReviewed}
-                className={`flex-1 py-1.5 rounded border border-gray-300 text-xs font-medium transition ${item.isReviewed
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
-                  }`}
-              >
-                {item.isReviewed ? "Review Submitted" : "Write Review"}
-              </button>
-              <button
-                onClick={() => onReturn(order, item)}
-                className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-              >
-                Return
-              </button>
-              <button
-                onClick={() => onBuyAgain(item)}
-                className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition text-center cursor-pointer"
-              >
-                Buy Again
-              </button>
-            </div>
-          )}
-        </div>
-            </>
-          );
-        })()}
 
-      </div>
-    ))}
+            {/* Action buttons row — inside the card */}
+            {(itemEffectiveStatus === "Processing" || itemEffectiveStatus === "Shipped") && (
+              <div className="flex items-center gap-3 px-3 pb-3">
+                <button
+                  onClick={onCancel}
+                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onTrack}
+                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {/* Person/location pin icon matching reference image */}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M20 21a8 8 0 1 0-16 0" />
+                  </svg>
+                  Track
+                </button>
+              </div>
+            )}
+            {itemEffectiveStatus === "Delivered" && (
+              <div className="flex items-center gap-3 px-3 pb-3">
+                <button
+                  onClick={() => !item.isReviewed && onReview(item)}
+                  disabled={item.isReviewed}
+                  className={`flex-1 py-1.5 rounded border border-gray-300 text-xs font-medium transition ${item.isReviewed
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    }`}
+                >
+                  {item.isReviewed ? "Review Submitted" : "Write Review"}
+                </button>
+                <button
+                  onClick={() => onReturn(order, item)}
+                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Return
+                </button>
+                <button
+                  onClick={() => onBuyAgain(item)}
+                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition text-center cursor-pointer"
+                >
+                  Buy Again
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    })}
   </div>
 );
-
-// ─── Skeleton loader ──────────────────────────────────────────────────────────
 
 const OrderSkeleton = () => (
   <div className="border border-gray-200 rounded-xl bg-white mb-4 overflow-hidden animate-pulse">

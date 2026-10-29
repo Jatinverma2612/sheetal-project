@@ -846,9 +846,11 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
       ? `${Math.round(((resolvedSize.price - resolvedSize.discountPrice) / resolvedSize.price) * 100)}`
       : "0";
 
+  const isProductOutOfStock =
+    selectedSizeObject ? selectedSizeObject.stock <= 0 : product.stock <= 0;
+
   const isProductUnavailable =
-    (selectedSizeObject ? selectedSizeObject.stock <= 0 : product.stock <= 0) ||
-    currentSelectedPrice <= 0;
+    isProductOutOfStock || currentSelectedPrice <= 0;
   // ─────────────────────────────────────────────────────────────────────────
 
   const productInfoData: ProductInfoData = {
@@ -1010,7 +1012,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
               setPincode={setPincode}
               pincodeMessage={pincodeMessage}
               checkPincode={checkPincode}
-              isOutOfStock={isProductUnavailable}
+              isOutOfStock={isProductOutOfStock}
               selectedVariantData={selectedVariantData}
               selectedVariantSizes={currentSelectedVariant?.sizes || []}
               hasSizeChart={Boolean(sizeChartData)}

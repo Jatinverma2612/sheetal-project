@@ -72,7 +72,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     icons: {
-      icon: faviconUrl,
+      icon: [
+        { url: "/favicon.ico" },
+        { url: faviconUrl || "/favicon.png", type: "image/png" },
+      ],
+      shortcut: "/favicon.ico",
+      apple: faviconUrl || "/favicon.png",
     },
   };
 }

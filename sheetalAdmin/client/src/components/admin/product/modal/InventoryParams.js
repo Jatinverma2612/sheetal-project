@@ -10,6 +10,7 @@ import {
 import { canonicalizeSizeName } from "@/utils/sizeUtils";
 
 const VARIANT_MEDIA_RATIO = { width: 3, height: 4 };
+const STANDARD_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 const VARIANT_MEDIA_RATIO_LABEL = getRatioLabel(
   VARIANT_MEDIA_RATIO.width,
   VARIANT_MEDIA_RATIO.height,
@@ -685,30 +686,41 @@ export default function InventoryParams({
                             <label className="text-[9px] font-bold text-slate-500 uppercase">
                               Size
                             </label>
-                            <input
-                              className={`w-full border px-3 py-2 rounded-lg text-xs ${
-                                isFreeSize
-                                  ? "bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed"
-                                  : isDuplicateSize
+                            {isFreeSize ? (
+                              <input
+                                className="w-full border px-3 py-2 rounded-lg text-xs bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed outline-none"
+                                value="Free Size"
+                                readOnly
+                                title="Free size — name is fixed"
+                              />
+                            ) : (
+                              <select
+                                className={`w-full border px-3 py-2 rounded-lg text-xs cursor-pointer ${
+                                  isDuplicateSize
                                     ? "bg-red-50 border-red-500 text-red-900 focus:ring-red-200"
                                     : "bg-white border-slate-300 focus:ring-slate-900"
-                              } outline-none transition-all`}
-                              placeholder="e.g. M, L, XL"
-                              value={isFreeSize ? "Free Size" : s.name}
-                              readOnly={isFreeSize}
-                              maxLength={isFreeSize ? undefined : 4}
-                              title={
-                                isFreeSize
-                                  ? "Free size — name is fixed"
-                                  : undefined
-                              }
-                              onChange={
-                                isFreeSize
-                                  ? undefined
-                                  : (e) =>
-                                      updateSize(i, s_idx, "name", e.target.value.slice(0, 4))
-                              }
-                            />
+                                } outline-none transition-all`}
+                                value={s.name || ""}
+                                onChange={(e) =>
+                                  updateSize(i, s_idx, "name", e.target.value)
+                                }
+                              >
+                                <option value="" disabled>
+                                  Select Size
+                                </option>
+                                {STANDARD_SIZES.map((sz) => (
+                                  <option key={sz} value={sz}>
+                                    {sz}
+                                  </option>
+                                ))}
+                                {s.name &&
+                                  !STANDARD_SIZES.includes(s.name) && (
+                                    <option value={s.name}>
+                                      {s.name}
+                                    </option>
+                                  )}
+                              </select>
+                            )}
                             {isDuplicateSize && (
                               <p className="text-[9px] font-bold text-red-500 mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
                                 Size already exists

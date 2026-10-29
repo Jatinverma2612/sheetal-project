@@ -85,28 +85,35 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     options.cache ??
     (method === "GET" && !hasNextConfig ? "no-store" : undefined);
 
-  const res = await fetch(url, {
-    ...options,
-    cache: resolvedCache,
-    headers: requestHeaders,
-  });
+  try {
+    const res = await fetch(url, {
+      ...options,
+      cache: resolvedCache,
+      headers: requestHeaders,
+    });
 
-  if (res.status === 401) {
-    logout();
-    return { success: false, unauthorized: true, message: "" };
+    if (res.status === 401) {
+      logout();
+      return { success: false, unauthorized: true, message: "" };
+    }
+
+    const data = await handleResponse(res);
+    if (
+      data &&
+      data.success === false &&
+      isAuthExpiredError(data.message, res.status)
+    ) {
+      logout();
+      return { ...data, unauthorized: true, message: "" };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Network request failed",
+    };
   }
-
-  const data = await handleResponse(res);
-  if (
-    data &&
-    data.success === false &&
-    isAuthExpiredError(data.message, res.status)
-  ) {
-    logout();
-    return { ...data, unauthorized: true, message: "" };
-  }
-
-  return data;
 };
 
 /**

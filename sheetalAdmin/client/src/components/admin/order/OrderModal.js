@@ -106,27 +106,58 @@ export default function OrderModal({
 
     setLoading(true);
     try {
-      const payload = {
-        status,
-        // Shipping info tabhi bhejte hain jab status Shipped ya Delivered ho
-        shippingInfo:
-          status === "Shipped" || status === "Delivered" ? shippingInfo : null,
-        shippedAt: status === "Shipped" ? new Date() : localOrder?.shippedAt,
-        deliveredAt:
-          status === "Delivered" ? new Date() : localOrder?.deliveredAt,
-      };
+      // Check if any item in itemStatusDrafts has unsaved status changes
+      const pendingItems = (localOrder?.orderItems || []).filter((item) => {
+        const draft = itemStatusDrafts[item._id];
+        return draft && draft !== (item.itemStatus || "Processing");
+      });
 
-      const res = await updateOrderStatus(localOrder?._id, payload);
-
-      if (res.success || res.status === 200) {
-        toast.success(`Order status updated to ${status}`);
-        if (onSuccess) onSuccess(res.data); // Refresh parents data
-        onClose();
+      let latestOrder = localOrder;
+      for (const item of pendingItems) {
+        try {
+          const itemRes = await updateOrderItemStatus(localOrder._id, item._id, {
+            status: itemStatusDrafts[item._id],
+          });
+          if (itemRes?.success && itemRes?.data) {
+            latestOrder = itemRes.data;
+          }
+        } catch (itemErr) {
+          toast.error(itemErr?.message || `Failed to update item: ${item.name}`);
+        }
       }
+
+      const initialStatus = initialData?.orderStatus || "Processing";
+      const hasTopLevelStatusChanged = status !== initialStatus;
+      const isShippedOrDelivered = status === "Shipped" || status === "Delivered";
+
+      let finalOrder = latestOrder;
+      if (hasTopLevelStatusChanged || isShippedOrDelivered || pendingItems.length === 0) {
+        const finalStatus = hasTopLevelStatusChanged ? status : (latestOrder?.orderStatus || status);
+        const payload = {
+          status: finalStatus,
+          shippingInfo:
+            finalStatus === "Shipped" || finalStatus === "Delivered" ? shippingInfo : null,
+          shippedAt: finalStatus === "Shipped" ? new Date() : latestOrder?.shippedAt,
+          deliveredAt:
+            finalStatus === "Delivered" ? new Date() : latestOrder?.deliveredAt,
+        };
+
+        try {
+          const res = await updateOrderStatus(localOrder?._id, payload);
+          if (res?.success || res?.status === 200) {
+            finalOrder = res.data || latestOrder;
+          }
+        } catch (orderErr) {
+          toast.error(orderErr?.message || "Failed to update order status");
+        }
+      }
+
+      toast.success("Order updated successfully");
+      if (onSuccess) onSuccess(finalOrder);
+      onClose();
     } catch (err) {
-      console.error("Update Error:", err);
       toast.error(
-        err.response?.data?.message || err.message || "Failed to update order status. Please try again.",
+        err?.response?.data?.message || err?.message || "Failed to update order status. Please try again.",
       );
     } finally {
       setLoading(false);

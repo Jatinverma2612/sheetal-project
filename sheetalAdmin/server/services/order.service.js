@@ -605,32 +605,51 @@ export const updateOrderItemStatusService = async (
   const orderItem = order.orderItems.id(orderItemId);
   if (!orderItem) throw ErrorResponse("Order item nahi mila", 404);
 
-  if (
-    TERMINAL_ITEM_STATUSES.has(orderItem.itemStatus) &&
-    orderItem.itemStatus !== status
-  ) {
-    throw ErrorResponse(
-      `Item is already in a terminal state: ${orderItem.itemStatus}`,
-      400,
-    );
+  if (!VALID_ITEM_STATUSES.has(status)) {
+    throw ErrorResponse(`Invalid item status: ${status}`, 400);
   }
 
+  const oldStatus = orderItem.itemStatus || "Processing";
+  if (oldStatus === status) {
+    return await Order.findById(orderId)
+      .populate({
+        path: "orderItems.product",
+        select: "name mainImage slug gstPercent category",
+        populate: {
+          path: "category",
+          select: "name hsnCode gstPercent",
+        },
+      })
+      .populate("user", "name email");
+  }
+
+  // Handle inventory adjustments safely
   if (status === "Cancelled" || status === "Returned") {
     if (orderItem.inventoryAdjusted) {
       await revertOrderInventoryAdjustments([orderItem]);
       orderItem.inventoryAdjusted = false;
     }
+  } else if (oldStatus === "Cancelled" || oldStatus === "Returned") {
+    if (!orderItem.inventoryAdjusted) {
+      await applyOrderInventoryAdjustments([orderItem]);
+      orderItem.inventoryAdjusted = true;
+    }
   }
 
   orderItem.itemStatus = status;
 
-  // Auto-calculate main order status if all items have the same status
-  const itemStatuses = order.orderItems.map((item) => item.itemStatus);
-  const uniqueStatuses = [...new Set(itemStatuses)];
-  if (uniqueStatuses.length === 1) {
-    order.orderStatus = uniqueStatuses[0];
-    if (uniqueStatuses[0] === "Delivered") {
-      order.deliveredAt = Date.now();
+  // Auto-calculate main order status based on active items
+  const itemStatuses = order.orderItems.map((item) => item.itemStatus || "Processing");
+  const nonCancelledStatuses = itemStatuses.filter((s) => s !== "Cancelled");
+  if (nonCancelledStatuses.length === 0) {
+    order.orderStatus = "Cancelled";
+  } else {
+    const uniqueActiveStatuses = [...new Set(nonCancelledStatuses)];
+    if (uniqueActiveStatuses.length === 1) {
+      order.orderStatus = uniqueActiveStatuses[0];
+      if (uniqueActiveStatuses[0] === "Delivered") {
+        order.deliveredAt = Date.now();
+      }
     }
   }
 

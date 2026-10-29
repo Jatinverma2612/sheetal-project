@@ -302,17 +302,32 @@ const setViewMode = (mode: "grid" | "list") => {
   ======================= */
   const filteredRawProducts = applyFilters(products, activeFilters);
 
+  const inStockRawProducts = filteredRawProducts.filter((p) => {
+    if (!p || p.status !== "Active") return false;
+    const hasVariantSizes = p.variants?.some(
+      (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+    );
+    if (hasVariantSizes) {
+      const hasVariantStock = p.variants.some((v) =>
+        v.sizes?.some((s) => Number(s.stock || 0) > 0),
+      );
+      const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+      return hasVariantStock && hasOverallStock;
+    }
+    return (p.stock ?? 0) > 0;
+  });
+
   // When navigating from a lookbook, show only discounted products
   // (i.e. at least one variant size where discountPrice < price)
   const lookbookFiltered = fromLookbook
-    ? filteredRawProducts.filter((p) =>
+    ? inStockRawProducts.filter((p) =>
         p.variants?.some((variant) =>
           variant.sizes?.some(
             (size) => size.discountPrice > 0 && size.discountPrice < size.price
           )
         )
       )
-    : filteredRawProducts;
+    : inStockRawProducts;
 
   const filteredProducts = lookbookFiltered.map((p) => {
     let lowestPrice = Infinity;

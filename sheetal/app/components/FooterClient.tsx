@@ -165,7 +165,7 @@ const FooterClient = ({
 
   return (
     <>
-      <footer
+      <footer suppressHydrationWarning
         className="w-full text-[#f8f0b4] font-[family-name:var(--font-montserrat)]"
         style={{
           backgroundImage: "url('/assets/footer-bg.jpg')",

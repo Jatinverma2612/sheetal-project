@@ -17,7 +17,18 @@ const handleResponse = async (res) => {
       `Server error (${res.status}): ${res.statusText || "Request failed"}`,
     );
   }
-  if (!res.ok) throw new Error(data?.message || "Something went wrong");
+  if (!res.ok) {
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+        document.cookie = "token=; path=/; max-age=0";
+        document.cookie = "token=; path=/; max-age=0; SameSite=None; Secure";
+        document.cookie = "token=; path=/; max-age=0; SameSite=Lax; Secure";
+      }
+      return { success: false, unauthorized: true, message: data?.message || "Invalid or expired token" };
+    }
+    throw new Error(data?.message || "Something went wrong");
+  }
   return data;
 };
 

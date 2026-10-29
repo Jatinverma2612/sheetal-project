@@ -204,7 +204,17 @@ const TrendingThisWeek = ({
   const isAvailableProduct = (p: Product): boolean => {
     if (!p || !p._id || !p.slug || !p.name) return false;
     if (p.status && p.status !== "Active") return false;
-    return true;
+    const hasVariantSizes = p.variants?.some(
+      (v: any) => Array.isArray(v.sizes) && v.sizes.length > 0,
+    );
+    if (hasVariantSizes) {
+      const hasVariantStock = p.variants.some((v: any) =>
+        v.sizes?.some((s: any) => Number(s.stock || 0) > 0),
+      );
+      const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+      return hasVariantStock && hasOverallStock;
+    }
+    return (p.stock ?? 0) > 0;
   };
 
   const formatProduct = (p: Product): TrendingProduct => {

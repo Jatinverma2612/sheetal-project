@@ -96,19 +96,27 @@ export const defaultHomepageSettings: HomepageSettings = {
 };
 
 const fetchJson = async (path: string) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...(isDev
-      ? { cache: "no-store" }
-      : { next: { revalidate: STOREFRONT_HEADER_REVALIDATE_SECONDS } }),
-  });
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...(isDev
+        ? { cache: "no-store" }
+        : { next: { revalidate: STOREFRONT_HEADER_REVALIDATE_SECONDS } }),
+    });
+    return response.json();
+  } catch {
+    return null;
+  }
 };
 
 const fetchJsonNoStore = async (path: string) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
-  });
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+    });
+    return response.json();
+  } catch {
+    return null;
+  }
 };
 
 const parseHomepageSettings = (settingsJson: any): HomepageSettings => {
