@@ -72,15 +72,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     icons: {
-      icon: [
-        { url: "/favicon.ico" },
-        { url: faviconUrl || "/favicon.png", type: "image/png" },
-      ],
-      shortcut: "/favicon.ico",
-      apple: faviconUrl || "/favicon.png",
+      icon: "/favicon.ico",
+      apple: "/favicon.png",
     },
   };
 }
+
+export const dynamic = "force-dynamic";
 
 export const viewport: Viewport = {
   width: "device-width",

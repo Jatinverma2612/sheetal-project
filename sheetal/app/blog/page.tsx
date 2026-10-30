@@ -9,6 +9,8 @@ import { getPageData } from "../components/PolicyPage";
 import { getSeoSettings } from "../services/seoSettingsService";
 import { buildPageSchema, parseSchemaString } from "../utils/schema";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const [data, seoSettings] = await Promise.all([
     getPageData("blog"),

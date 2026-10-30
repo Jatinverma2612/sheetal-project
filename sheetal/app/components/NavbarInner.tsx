@@ -504,7 +504,7 @@ const DesktopMoreMenu = ({
   onOpen: () => void;
   onClose: () => void;
 }) => {
-  if (!items.length) return null;
+  if (!items?.length) return null;
 
   return (
     <li

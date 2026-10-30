@@ -23,9 +23,9 @@ const ABOUT_ITEM_ID = "about";
 
 const buildMenuTree = (
   parent: Category | null,
-  categories: Category[],
+  categories: Category[] = [],
 ): NavbarNavItem[] => {
-  return categories
+  return (categories || [])
     .filter((category) => {
       if (!parent) return !category.parentCategory;
       if (!category.parentCategory || typeof category.parentCategory !== "object") {
@@ -45,9 +45,9 @@ const buildMenuTree = (
 };
 
 export const buildDefaultNavbarLayout = (
-  categories: Category[],
+  categories: Category[] = [],
 ): NavbarLayoutItem[] => {
-  const topLevelCategories = categories.filter((category) => !category.parentCategory);
+  const topLevelCategories = (categories || []).filter((category) => !category.parentCategory);
 
   return [
     ...topLevelCategories.map((category) => ({
@@ -70,10 +70,10 @@ export const buildDefaultNavbarLayout = (
 };
 
 export const buildNavbarNavItems = (
-  categories: Category[],
+  categories: Category[] = [],
   savedLayout?: NavbarLayoutItem[] | null,
 ): NavbarNavItem[] => {
-  const categoryNavItems = buildMenuTree(null, categories);
+  const categoryNavItems = buildMenuTree(null, categories || []);
   const categoryMap = new Map(categoryNavItems.map((item) => [item.id, item]));
   const staticItems = new Map<string, NavbarNavItem>([
     [ABOUT_ITEM_ID, { id: ABOUT_ITEM_ID, label: "Our Story", href: "/about-us#our-story" }],

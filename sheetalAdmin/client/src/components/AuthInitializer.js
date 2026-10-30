@@ -27,7 +27,14 @@ if (typeof window !== "undefined" && !window.__fetchIntercepted) {
       }
     }
     
-    return originalFetch.call(this, newResource, newOptions);
+    try {
+      return await originalFetch.call(this, newResource, newOptions);
+    } catch (err) {
+      return new Response(
+        JSON.stringify({ success: false, message: err?.message || "Failed to fetch" }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      );
+    }
   };
 }
 

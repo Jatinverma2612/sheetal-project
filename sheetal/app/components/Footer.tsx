@@ -161,7 +161,7 @@ async function getFooterData(): Promise<{
         }
       });
 
-      if (!footerPages.length) return nextLayout;
+      if (!footerPages?.length) return nextLayout;
 
       const doubleBlock = nextLayout.find(
         (block): block is Extract<FooterBlock, { type: "double" }> =>

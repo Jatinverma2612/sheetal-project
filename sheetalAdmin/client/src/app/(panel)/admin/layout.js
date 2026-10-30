@@ -50,14 +50,21 @@ export default function AdminLayout({ children }) {
         args = [input, { ...init, headers }];
       }
 
-      const response = await originalFetch(...args);
-      if (response.status === 401) {
-        const url = typeof args[0] === "string" ? args[0] : args[0]?.url || "";
-        if (!url.includes("/auth/status") && !url.includes("/auth/login")) {
-          handleUnauthorized();
+      try {
+        const response = await originalFetch(...args);
+        if (response.status === 401) {
+          const url = typeof args[0] === "string" ? args[0] : args[0]?.url || "";
+          if (!url.includes("/auth/status") && !url.includes("/auth/login")) {
+            handleUnauthorized();
+          }
         }
+        return response;
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ success: false, message: err?.message || "Failed to fetch" }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        );
       }
-      return response;
     };
 
     // ── 2. Axios request interceptor: inject Bearer token ───────────────────

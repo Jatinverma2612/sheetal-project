@@ -35,6 +35,7 @@ interface RawOrderItem {
   price: number;
   quantity: number;
   isReviewed?: boolean;
+  itemStatus?: OrderStatus;
   variant?: {
     size?: string;
     color?: string;
@@ -113,6 +114,7 @@ interface UIOrderItem {
   price: number;
   quantity: number;
   isReviewed: boolean;
+  status: OrderStatus;
 }
 
 // ─── Backend → UI normaliser ─────────────────────────────────────────────────
