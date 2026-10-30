@@ -16,6 +16,8 @@ import { getSettings, updateSettings } from "@/services/settingsService";
 
 export default function DeliveryReturnsPage() {
   const [settings, setSettings] = useState({
+    shippingFee: 0,
+    freeShippingThreshold: 0,
     prepaidShippingCharge: "",
     codShippingCharge: "",
     returnPolicyContent: "",
@@ -37,6 +39,8 @@ export default function DeliveryReturnsPage() {
       const response = await getSettings();
       if (response?.success && response?.data) {
         setSettings({
+          shippingFee: response.data.shippingFee ?? 0,
+          freeShippingThreshold: response.data.freeShippingThreshold ?? 0,
           prepaidShippingCharge: response.data.prepaidShippingCharge || "",
           codShippingCharge: response.data.codShippingCharge || "",
           returnPolicyContent: response.data.returnPolicyContent || "",
@@ -98,7 +102,45 @@ export default function DeliveryReturnsPage() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className={labelStyle}>Pre-Paid Shipping Charge</label>
+              <label className={labelStyle}>Standard Shipping Fee (₹)</label>
+              <input
+                type="number"
+                min="0"
+                value={settings.shippingFee}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    shippingFee: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                placeholder="0 for Free Shipping"
+                className={inputStyle}
+              />
+              <p className="mt-1.5 text-[10px] text-slate-400 font-bold">
+                Charged during cart &amp; checkout when order is below threshold. Set to 0 for free shipping on all orders.
+              </p>
+            </div>
+            <div>
+              <label className={labelStyle}>Free Shipping Above (₹)</label>
+              <input
+                type="number"
+                min="0"
+                value={settings.freeShippingThreshold}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    freeShippingThreshold: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                placeholder="0 for no threshold"
+                className={inputStyle}
+              />
+              <p className="mt-1.5 text-[10px] text-slate-400 font-bold">
+                Orders with item total greater than or equal to this amount qualify for Free Shipping.
+              </p>
+            </div>
+            <div>
+              <label className={labelStyle}>Pre-Paid Shipping Display Label</label>
               <input
                 type="text"
                 value={settings.prepaidShippingCharge}
@@ -111,9 +153,12 @@ export default function DeliveryReturnsPage() {
                 placeholder="e.g. Free Shipping"
                 className={inputStyle}
               />
+              <p className="mt-1.5 text-[10px] text-slate-400 font-bold">
+                Display text in the product details shipping table for Pre-Paid orders.
+              </p>
             </div>
             <div>
-              <label className={labelStyle}>COD Shipping Charge</label>
+              <label className={labelStyle}>COD Shipping Display Label</label>
               <input
                 type="text"
                 value={settings.codShippingCharge}
@@ -126,6 +171,9 @@ export default function DeliveryReturnsPage() {
                 placeholder="e.g. Free Shipping"
                 className={inputStyle}
               />
+              <p className="mt-1.5 text-[10px] text-slate-400 font-bold">
+                Display text in the product details shipping table for COD orders.
+              </p>
             </div>
           </div>
         </div>

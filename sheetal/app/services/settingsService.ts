@@ -33,6 +33,7 @@ interface Settings {
     dimensions?: { width: number; height: number };
   };
   favicon?: string;
+  loginImage?: string;
   logoHistory?: any[];
 }
 
@@ -70,4 +71,10 @@ export const getLogoUrl = (
 
 export const getFaviconUrl = (settings: Settings | null): string => {
   return settings?.favicon || "/assets/335014072.png";
+};
+
+export const getLoginImageUrl = (
+  settings?: { loginImage?: string } | Record<string, any> | null,
+): string => {
+  return settings?.loginImage || "/assets/updated-login-left.jpg";
 };

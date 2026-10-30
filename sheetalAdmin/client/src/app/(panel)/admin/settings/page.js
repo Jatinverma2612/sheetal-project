@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe, Mail, Phone, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/admin/layout/PageHeader.js";
-import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon } from "@/services/settingsService";
+import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon, updateLoginImage } from "@/services/settingsService";
 
 export default function SettingsPage() {
   const inputStyle =
@@ -22,8 +22,10 @@ export default function SettingsPage() {
   const [brandSettings, setBrandSettings] = useState({
     logo: null,
     favicon: "",
+    loginImage: "",
     logoHistory: [],
   });
+  const [isUploadingLoginImage, setIsUploadingLoginImage] = useState(false);
 
   const [contactSettings, setContactSettings] = useState({
     supportEmail: "info@studiobysheetal.com",
@@ -57,6 +59,7 @@ export default function SettingsPage() {
         setBrandSettings({
           logo: settingsRes.data.logo || null,
           favicon: settingsRes.data.favicon || "",
+          loginImage: settingsRes.data.loginImage || "",
           logoHistory: settingsRes.data.logoHistory || [],
         });
 
@@ -189,6 +192,43 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLoginImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be under 5MB");
+      return;
+    }
+
+    setIsUploadingLoginImage(true);
+    const formData = new FormData();
+    formData.append("loginImage", file);
+
+    try {
+      const res = await updateLoginImage(formData);
+      if (res.success) {
+        toast.success("Login banner updated successfully!");
+        setBrandSettings((prev) => ({
+          ...prev,
+          loginImage: res.data.loginImage,
+        }));
+      } else {
+        toast.error(res.message || "Failed to update login banner");
+      }
+    } catch (error) {
+      toast.error("Failed to upload login banner");
+    } finally {
+      setIsUploadingLoginImage(false);
+      e.target.value = "";
+    }
+  };
+
   const handleRestoreLogo = async (historyId) => {
     if (!confirm("Are you sure you want to restore this version?")) return;
 
@@ -309,6 +349,40 @@ export default function SettingsPage() {
                         accept="image/x-icon,image/png,image/svg+xml"
                         onChange={handleFaviconUpload}
                         disabled={isUploadingFavicon}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Login Page Banner Upload */}
+              <div className="space-y-4">
+                <label className={labelStyle}>Storefront Login Page Banner</label>
+                <div className="flex items-start gap-6">
+                  <div className="h-24 w-20 shrink-0 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center overflow-hidden">
+                    <img
+                      src={brandSettings.loginImage || "/assets/updated-login-left.jpg"}
+                      alt="Login Banner"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      This banner appears on the left side of the customer Login / Signup modal.
+                    </p>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800 disabled:opacity-70">
+                      {isUploadingLoginImage ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Upload size={12} />
+                      )}
+                      {isUploadingLoginImage ? "Uploading..." : "Upload Banner"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleLoginImageUpload}
+                        disabled={isUploadingLoginImage}
                       />
                     </label>
                   </div>

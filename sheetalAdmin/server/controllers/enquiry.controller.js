@@ -171,6 +171,9 @@ export const updateStatus = async (req, res, next) => {
     }
 
     enquiry.status = status;
+    if (status === "replied" && reply?.trim()) {
+      enquiry.reply = reply.trim();
+    }
     await enquiry.save();
 
     res.status(200).json({ success: true, enquiry });

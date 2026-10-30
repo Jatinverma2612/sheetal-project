@@ -345,14 +345,18 @@ const AddressPageInner = () => {
       try {
         const settings = await getSettings();
         setPlatformFee(Number(settings.platformFee) || 0);
-        setBaseShippingFee(Number(settings.shippingFee) || 0);
-        setFreeShippingThreshold(Number(settings.freeShippingThreshold) || 0);
 
+        const fee = Number(settings.shippingFee) || 0;
         const threshold = Number(settings.freeShippingThreshold) || 0;
-        if (netItemsTotal > threshold && threshold > 0) {
+        const isPrepaidFree = String(settings.prepaidShippingCharge || "").trim().toLowerCase().includes("free");
+
+        setBaseShippingFee(fee);
+        setFreeShippingThreshold(threshold);
+
+        if (fee === 0 || isPrepaidFree || (threshold > 0 && netItemsTotal >= threshold)) {
           setShippingCharges(0);
         } else {
-          setShippingCharges(Number(settings.shippingFee) || 0);
+          setShippingCharges(fee);
         }
       } catch (err) {
         console.error("Failed to fetch settings", err);
@@ -362,7 +366,7 @@ const AddressPageInner = () => {
   }, [netItemsTotal]);
 
   useEffect(() => {
-    if (netItemsTotal > freeShippingThreshold && freeShippingThreshold > 0) {
+    if (baseShippingFee === 0 || (freeShippingThreshold > 0 && netItemsTotal >= freeShippingThreshold)) {
       setShippingCharges(0);
     } else {
       setShippingCharges(baseShippingFee);

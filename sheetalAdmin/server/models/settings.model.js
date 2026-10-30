@@ -94,6 +94,7 @@ const settingsSchema = new mongoose.Schema(
       },
     },
     favicon: { type: String },
+    loginImage: { type: String, default: "/assets/updated-login-left.jpg" },
     logoHistory: [
       {
         url: { type: String },

@@ -61,3 +61,16 @@ export const updateFavicon = async (formData) => {
     });
     return response.data;
 };
+
+// Update storefront login image
+export const updateLoginImage = async (formData) => {
+    const token = localStorage.getItem("token");
+    const response = await axios.post(`${API_BASE_URL}/settings/login-image`, formData, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+        },
+        withCredentials: true,
+    });
+    return response.data;
+};

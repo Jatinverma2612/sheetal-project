@@ -278,15 +278,18 @@ export const getUserStatsService = async ({ startDate, endDate } = {}) => {
     status: "Inactive",
   });
 
-  const today = Object.keys(createdAt).length
-    ? total
-    : await User.countDocuments({
-        ...roleQuery,
-        createdAt: {
-          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-          $lte: new Date(new Date().setHours(23, 59, 59, 999)),
-        },
-      });
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const today = await User.countDocuments({
+    ...roleQuery,
+    createdAt: {
+      $gte: todayStart,
+      $lte: todayEnd,
+    },
+  });
 
   return { success: true, data: { total, active, inactive, today } };
 };

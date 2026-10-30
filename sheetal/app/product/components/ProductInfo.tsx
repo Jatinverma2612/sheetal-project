@@ -585,10 +585,10 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
           <p className="mt-2 text-xs md:text-sm">
             For more details please read{" "}
             <Link
-              href="/return-and-cancellation-policy"
+              href="/return-exchange-policy"
               className="text-gray-900 underline hover:text-black"
             >
-              Return and Cancellation Policy
+              Return & Exchange Policy
             </Link>
             .
           </p>

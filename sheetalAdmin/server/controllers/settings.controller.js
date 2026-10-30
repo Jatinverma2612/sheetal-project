@@ -67,3 +67,18 @@ export const updateFavicon = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateLoginImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No login image file uploaded" });
+    }
+
+    const imageUrl = req.file.location || req.file.url || req.file.path;
+    const result = await settingsService.updateSettings({ loginImage: imageUrl });
+    if (!result.success) return res.status(500).json(result);
+    return successResponse(res, 200, result.data, "Login image updated successfully");
+  } catch (error) {
+    next(error);
+  }
+};

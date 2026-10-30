@@ -41,12 +41,19 @@ export default function UserDetailPage() {
   const [addressIndex, setAddressIndex] = useState(null);
 
   const fetchFullDetails = async () => {
+    if (!id || id === "[id]" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      setLoading(false);
+      setUser(null);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await getUserById(id);
-      if (res.success) setUser(res.data);
+      if (res?.success) setUser(res.data);
+      else setUser(null);
     } catch (err) {
-      console.error("Failed to fetch", err);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -123,8 +130,24 @@ export default function UserDetailPage() {
   };
 
   if (loading)
-    return <div className="animate-pulse p-20 text-center">Loading...</div>;
-  if (!user) return <div>User not found</div>;
+    return <div className="animate-pulse p-20 text-center text-slate-400 font-bold">Loading customer details...</div>;
+  if (!user) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-sm mt-6">
+        <UserX size={48} className="text-slate-300 mb-4" />
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Customer Not Found</h3>
+        <p className="text-sm text-slate-400 mb-6 max-w-sm">
+          Please select a valid customer from the customer management table.
+        </p>
+        <button
+          onClick={() => router.push("/admin/customers")}
+          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+        >
+          Back to Customers
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full animate-in fade-in duration-500">
@@ -342,14 +365,25 @@ export default function UserDetailPage() {
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">
                             Status
                           </p>
-                          <span
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${order.status === "Delivered"
+                          {(() => {
+                            const effectiveStatus = order.orderStatus || order.status || "Processing";
+                            const statusColor =
+                              effectiveStatus === "Delivered"
                                 ? "bg-emerald-100 text-emerald-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
-                          >
-                            {order.status || "Processing"}
-                          </span>
+                                : effectiveStatus === "Shipped"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : effectiveStatus === "Cancelled"
+                                    ? "bg-rose-100 text-rose-700"
+                                    : "bg-amber-100 text-amber-700";
+
+                            return (
+                              <span
+                                className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${statusColor}`}
+                              >
+                                {effectiveStatus}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className="text-right">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">

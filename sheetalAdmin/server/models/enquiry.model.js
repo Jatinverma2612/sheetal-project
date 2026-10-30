@@ -14,6 +14,7 @@ const enquirySchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, required: true, trim: true },
     message: { type: String, trim: true, default: "" },
+    reply: { type: String, trim: true, default: "" },
     status: {
       type: String,
       enum: ["new", "read", "replied"],

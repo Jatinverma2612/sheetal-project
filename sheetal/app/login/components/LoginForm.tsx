@@ -29,7 +29,7 @@ import {
 } from "../../utils/authRedirect";
 import { getLoginCoupon } from "../../services/couponService";
 import { useSettings } from "../../hooks/useSettings";
-import { getLogoUrl } from "../../services/settingsService";
+import { getLogoUrl, getLoginImageUrl } from "../../services/settingsService";
 import toast from "react-hot-toast";
 
 declare global {
@@ -321,7 +321,7 @@ const LoginForm = () => {
           {/* LEFT IMAGE */}
           <div className="relative hidden md:block overflow-hidden">
             <Image
-              src="/assets/updated-login-left.jpg"
+              src={getLoginImageUrl(settings)}
               alt="Register Offer"
               fill
               className="object-cover object-top"

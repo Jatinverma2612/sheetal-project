@@ -861,12 +861,21 @@ const NavbarInner = ({
   const [cartPopupProductName, setCartPopupProductName] = useState("");
   const [isCartPopupHovered, setIsCartPopupHovered] = useState(false);
   const [navbarBottom, setNavbarBottom] = useState(0);
+  const DEFAULT_INITIAL_VISIBLE_COUNT = 7;
   const [desktopVisibleItems, setDesktopVisibleItems] = useState<
     NavbarNavItem[]
-  >(() => initialNavItems);
+  >(() =>
+    initialNavItems.length > DEFAULT_INITIAL_VISIBLE_COUNT
+      ? initialNavItems.slice(0, DEFAULT_INITIAL_VISIBLE_COUNT)
+      : initialNavItems,
+  );
   const [desktopOverflowItems, setDesktopOverflowItems] = useState<
     NavbarNavItem[]
-  >([]);
+  >(() =>
+    initialNavItems.length > DEFAULT_INITIAL_VISIBLE_COUNT
+      ? initialNavItems.slice(DEFAULT_INITIAL_VISIBLE_COUNT)
+      : [],
+  );
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const desktopNavRef = useRef<HTMLDivElement | null>(null);
@@ -1075,9 +1084,13 @@ const NavbarInner = ({
 
   useEffect(() => {
     recalculateDesktopOverflow();
+    const frameId = requestAnimationFrame(() => {
+      recalculateDesktopOverflow();
+    });
     window.addEventListener("resize", recalculateDesktopOverflow);
 
     return () => {
+      cancelAnimationFrame(frameId);
       window.removeEventListener("resize", recalculateDesktopOverflow);
     };
   }, [recalculateDesktopOverflow]);
@@ -1194,7 +1207,7 @@ const NavbarInner = ({
               </ul>
             </div>
 
-            <div className="flex items-center gap-4 shrink-0 self-stretch">
+            <div className="flex items-center gap-4 shrink-0 self-stretch relative z-10">
               <button
                 onClick={toggleSearch}
                 className="hover:opacity-80 transition-opacity cursor-pointer"

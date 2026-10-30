@@ -80,6 +80,15 @@ export default function EnquiryModal({
                  .replaceAll("{{productImage}}", prodImg)
                  .replaceAll("{{productUrl}}", prodUrl)
                  .replaceAll("{{reply}}", replyText || ""); 
+
+      if (!template.includes("{{reply}}") && replyText) {
+        const replyBox = `<div style="margin:20px 36px;padding:16px 20px;background:#faf7f2;border-left:4px solid #c9a96e;border-radius:8px;"><p style="margin:0 0 6px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8c734b;">Response From Our Team:</p><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1208;white-space:pre-wrap;">${replyText}</p></div>`;
+        if (html.includes("<!-- PRODUCT DETAILS -->")) {
+          html = html.replace("<!-- PRODUCT DETAILS -->", `<tr><td>${replyBox}</td></tr><!-- PRODUCT DETAILS -->`);
+        } else {
+          html = html.replace("</body>", `${replyBox}</body>`);
+        }
+      }
     }
     return html;
   };
@@ -138,6 +147,9 @@ export default function EnquiryModal({
               {enquiry.message && (
                 <DetailRow icon={MessageSquare} label="Message" value={enquiry.message} />
               )}
+              {enquiry.reply && (
+                <DetailRow icon={Send} label="Our Reply" value={enquiry.reply} />
+              )}
             </>
           )}
         </div>
@@ -176,7 +188,7 @@ export default function EnquiryModal({
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Type your reply here..."
-                className="w-full min-h-[120px] p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 transition-all resize-none"
+                className="w-full min-h-[120px] p-4 bg-white border border-slate-300 rounded-2xl text-sm font-normal text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all resize-none shadow-sm"
               />
             )}
 
