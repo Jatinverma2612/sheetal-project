@@ -13,7 +13,9 @@ const resolveBaseUrl = () => {
   ) {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return (
+    process.env.NEXT_PUBLIC_API_URL || "https://node.projects.codenap.in/mmk"
+  );
 };
 
 export const BASE_URL = resolveBaseUrl();

@@ -76,6 +76,14 @@ const legacyPageDefaults = {
       <p>After inspection, refunds or exchanges are processed according to the applicable payment method and timelines.</p>
     `.trim(),
   },
+  "product-list": {
+    title: "All Products",
+    content: "<p>Browse our complete collection of exquisite sarees, ethnic wear, and designer ensembles.</p>",
+    metaTitle: "All Products | Studio By Sheetal",
+    metaDescription: "Browse our complete collection of exquisite sarees, ethnic wear, and designer ensembles at Studio By Sheetal.",
+    metaKeywords: "saree collection, designer ethnic wear, luxury sarees, bridal collection, Studio By Sheetal products",
+    status: "Published",
+  },
 };
 
 // @desc    Get About Page Data
@@ -180,7 +188,7 @@ export const getPageBySlug = async (req, res, next) => {
 
     if (LEGACY_PAGE_SLUGS.includes(slug)) {
       page = await Page.findOne({ slug });
-      if (!page) {
+      if (!page && legacyPageDefaults[slug]) {
         page = await Page.create({
           slug,
           ...legacyPageDefaults[slug],

@@ -17,6 +17,7 @@ interface CategoryPageProps {
 
 // Direct server-side fetch — bypasses apiFetch which needs browser context
 
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
