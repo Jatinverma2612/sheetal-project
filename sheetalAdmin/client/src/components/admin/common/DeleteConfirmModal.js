@@ -6,18 +6,19 @@ export default function DeleteConfirmModal({
   isOpen,
   onClose,
   onConfirm,
-  entityName,
+  entityName = "item",
   itemName,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen) return null;
 
+  const safeEntityName = entityName || "item";
   const displayEntityName =
-    entityName.charAt(0).toUpperCase() + entityName.slice(1);
+    safeEntityName.charAt(0).toUpperCase() + safeEntityName.slice(1);
   const confirmationText = itemName
     ? `Are you sure you want to delete ${itemName}?`
-    : `Are you sure you want to delete this ${entityName}?`;
+    : `Are you sure you want to delete this ${safeEntityName}?`;
 
   const handleConfirm = async () => {
     if (isDeleting) return;

@@ -510,6 +510,8 @@ export default function UserDetailPage() {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteConfirm}
+        entityName="customer"
+        itemName={user?.name}
       />
 
       <ViewOrderDrawer
