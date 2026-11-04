@@ -82,3 +82,29 @@ export const updateLoginImage = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateEnquiryImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No enquiry image file uploaded" });
+    }
+
+    const isPng =
+      (req.file.mimetype && req.file.mimetype.toLowerCase().includes("png")) ||
+      (req.file.originalname && req.file.originalname.toLowerCase().endsWith(".png"));
+
+    if (!isPng) {
+      return res.status(400).json({
+        success: false,
+        message: "Only transparent PNG images (.png) are supported for the enquiry badge.",
+      });
+    }
+
+    const imageUrl = req.file.location || req.file.url || req.file.path;
+    const result = await settingsService.updateSettings({ enquiryImage: imageUrl });
+    if (!result.success) return res.status(500).json(result);
+    return successResponse(res, 200, result.data, "Enquiry image updated successfully");
+  } catch (error) {
+    next(error);
+  }
+};

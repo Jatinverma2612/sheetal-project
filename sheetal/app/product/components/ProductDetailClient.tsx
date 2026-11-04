@@ -41,7 +41,7 @@ import { ORDER_CONFIRMED_EVENT } from "../../hooks/shopEvents";
 import { buildProductReviewsHref } from "../../utils/productRoutes";
 import toast from "react-hot-toast";
 import useSWR from "swr";
-import { getSettings } from "../../services/settingsService";
+import { getSettings, getEnquiryImageUrl } from "../../services/settingsService";
 import { canonicalizeSizeName } from "../../utils/sizeUtils";
 
 const getStockLimitMessage = (count: number) =>
@@ -966,6 +966,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
             {product.name}
           </h1>
         </div>
+        
 
         <div className="flex flex-col lg:flex-row md:gap-13">
           <div className="lg:w-7/12">
@@ -1050,6 +1051,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
         productTitle={product.name}
         sizes={productInfoData.allSizes}
         defaultSize={selectedSize}
+        badgeImage={getEnquiryImageUrl(settings)}
       />
 
       <SizeChartModal

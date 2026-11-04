@@ -54,10 +54,21 @@ interface LoginCoupon {
   applicableIds?: Array<{ name?: string; slug?: string } | string>;
 }
 
+interface LoginFormProps {
+  initialLoginImage?: string;
+  initialLogoUrl?: string;
+  initialSettings?: any;
+}
+
 // ✅ Inner component that safely uses useSearchParams
-const LoginForm = () => {
-  const { settings } = useSettings();
-  const logoUrl = getLogoUrl(settings);
+const LoginForm = ({
+  initialLoginImage,
+  initialLogoUrl,
+  initialSettings,
+}: LoginFormProps = {}) => {
+  const { settings } = useSettings(initialSettings);
+  const logoUrl = initialLogoUrl || getLogoUrl(settings);
+  const loginImageUrl = initialLoginImage || getLoginImageUrl(settings);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -321,11 +332,12 @@ const LoginForm = () => {
           {/* LEFT IMAGE */}
           <div className="relative hidden md:block overflow-hidden">
             <Image
-              src={getLoginImageUrl(settings)}
+              src={loginImageUrl}
               alt="Register Offer"
               fill
               className="object-cover object-top"
               priority
+              suppressHydrationWarning
             />
             <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
@@ -364,6 +376,7 @@ const LoginForm = () => {
                     width={180}
                     height={60}
                     className="h-[60px] w-auto object-contain"
+                    suppressHydrationWarning
                   />
                 </Link>
               </div>

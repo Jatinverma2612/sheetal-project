@@ -119,7 +119,7 @@ export const fetchCategoryBySlugServer = async (
 ): Promise<Category | null> => {
   try {
     const res = await apiFetch(`/categories/${slug}`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     return res?.data ?? null;
   } catch (error) {

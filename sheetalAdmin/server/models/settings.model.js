@@ -95,6 +95,7 @@ const settingsSchema = new mongoose.Schema(
     },
     favicon: { type: String },
     loginImage: { type: String, default: "/assets/updated-login-left.jpg" },
+    enquiryImage: { type: String, default: "/assets/popu-element-img.png" },
     logoHistory: [
       {
         url: { type: String },

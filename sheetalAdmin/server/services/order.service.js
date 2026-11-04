@@ -6,7 +6,7 @@ import Cart from "../models/cart.model.js";
 import Review from "../models/review.model.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 import { createShiprocketOrder } from "./shiprocket.service.js";
-import { sendOrderConfirmationEmail } from "./order.email.service.js";
+import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from "./order.email.service.js";
 import { completeAbandonedCartFlow } from "./abandonedCart.service.js";
 import {
   confirmCouponUsageForOrder,
@@ -580,9 +580,13 @@ export const updateOrderStatusService = async (
     });
   }
 
+  if (status === "Cancelled") {
+    order.totalPrice = 0;
+  }
+
   await order.save();
 
-  return await Order.findById(orderId)
+  const populatedOrder = await Order.findById(orderId)
     .populate({
       path: "orderItems.product",
       select: "name mainImage slug gstPercent category",
@@ -592,6 +596,19 @@ export const updateOrderStatusService = async (
       },
     })
     .populate("user", "name email");
+
+  if (status !== oldStatus) {
+    sendOrderStatusUpdateEmail({
+      order: populatedOrder,
+      user: populatedOrder.user,
+      updatedStatus: status,
+      trackingInfo: trackingData,
+    }).catch((err) =>
+      console.error("[Order] Failed to send status update email:", err.message),
+    );
+  }
+
+  return populatedOrder;
 };
 
 export const updateOrderItemStatusService = async (
@@ -638,12 +655,29 @@ export const updateOrderItemStatusService = async (
 
   orderItem.itemStatus = status;
 
-  // Auto-calculate main order status based on active items
-  const itemStatuses = order.orderItems.map((item) => item.itemStatus || "Processing");
-  const nonCancelledStatuses = itemStatuses.filter((s) => s !== "Cancelled");
-  if (nonCancelledStatuses.length === 0) {
+  // Dynamically recalculate active items & prices
+  const activeItems = order.orderItems.filter(
+    (item) => item.itemStatus !== "Cancelled",
+  );
+  const activeItemsPrice = activeItems.reduce(
+    (acc, item) => acc + (item.price || 0) * (item.quantity || 1),
+    0,
+  );
+  order.itemsPrice = activeItemsPrice;
+
+  if (activeItems.length === 0) {
     order.orderStatus = "Cancelled";
+    order.totalPrice = 0;
   } else {
+    const shipping = order.shippingPrice || 0;
+    const tax = order.taxPrice || 0;
+    const discount = order.discountPrice || 0;
+    order.totalPrice = Math.max(0, activeItemsPrice + shipping + tax - discount);
+
+    // Auto-calculate main order status based on active items
+    const nonCancelledStatuses = activeItems.map(
+      (item) => item.itemStatus || "Processing",
+    );
     const uniqueActiveStatuses = [...new Set(nonCancelledStatuses)];
     if (uniqueActiveStatuses.length === 1) {
       order.orderStatus = uniqueActiveStatuses[0];
@@ -655,7 +689,7 @@ export const updateOrderItemStatusService = async (
 
   await order.save();
 
-  return await Order.findById(orderId)
+  const populatedOrder = await Order.findById(orderId)
     .populate({
       path: "orderItems.product",
       select: "name mainImage slug gstPercent category",
@@ -665,6 +699,23 @@ export const updateOrderItemStatusService = async (
       },
     })
     .populate("user", "name email");
+
+  // Send dynamic email notification for item status change
+  sendOrderStatusUpdateEmail({
+    order: populatedOrder,
+    user: populatedOrder.user,
+    updatedItem: {
+      name: orderItem.name,
+      quantity: orderItem.quantity,
+      price: orderItem.price,
+      status: status,
+    },
+    updatedStatus: populatedOrder.orderStatus,
+  }).catch((err) =>
+    console.error("[Order] Failed to send item status email:", err.message),
+  );
+
+  return populatedOrder;
 };
 
 // --- GET MY ORDERS (User) ---

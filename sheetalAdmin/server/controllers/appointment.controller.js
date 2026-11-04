@@ -1,5 +1,9 @@
 import Appointment from "../models/appointment.model.js";
-import { sendAppointmentConfirmationEmail } from "../services/appointment.email.service.js";
+import {
+  sendAppointmentConfirmationEmail,
+  sendAppointmentPendingEmail,
+  sendAppointmentCancelledEmail,
+} from "../services/appointment.email.service.js";
 
 // @desc    Book an appointment
 // @route   POST /api/v1/appointments

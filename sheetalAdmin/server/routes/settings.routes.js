@@ -6,6 +6,7 @@ import {
   restoreLogo,
   updateFavicon,
   updateLoginImage,
+  updateEnquiryImage,
 } from "../controllers/settings.controller.js";
 import { isAuthenticated, isAdmin } from "../middlewares/auth.middleware.js";
 import { uploadTo } from "../middlewares/multer.middleware.js";
@@ -35,6 +36,13 @@ router.post(
   isAdmin,
   uploadTo("brand").single("loginImage"),
   updateLoginImage,
+);
+router.post(
+  "/enquiry-image",
+  isAuthenticated,
+  isAdmin,
+  uploadTo("brand").single("enquiryImage"),
+  updateEnquiryImage,
 );
 
 export default router;

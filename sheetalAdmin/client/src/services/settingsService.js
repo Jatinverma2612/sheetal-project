@@ -74,3 +74,16 @@ export const updateLoginImage = async (formData) => {
     });
     return response.data;
 };
+
+// Update storefront enquiry image
+export const updateEnquiryImage = async (formData) => {
+    const token = localStorage.getItem("token");
+    const response = await axios.post(`${API_BASE_URL}/settings/enquiry-image`, formData, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+        },
+        withCredentials: true,
+    });
+    return response.data;
+};

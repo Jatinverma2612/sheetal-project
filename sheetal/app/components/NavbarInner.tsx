@@ -1180,6 +1180,7 @@ const NavbarInner = ({
                   width={150}
                   height={55}
                   className="h-[55px] w-[150px] object-contain"
+                  suppressHydrationWarning
                 />
               )}
             </Link>
@@ -1360,6 +1361,7 @@ const NavbarInner = ({
         width={140}
         height={44}
         className="h-[44px] w-[140px] object-contain"
+        suppressHydrationWarning
       />
     </Link>
 

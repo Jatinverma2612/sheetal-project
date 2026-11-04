@@ -8,6 +8,7 @@ interface EnquireModalProps {
   productTitle: string;
   sizes?: { name: string }[];
   defaultSize?: string;
+  badgeImage?: string;
 }
 
 const EnquireModal: React.FC<EnquireModalProps> = ({
@@ -16,7 +17,9 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
   productTitle,
   sizes = [],
   defaultSize = "",
+  badgeImage,
 }) => {
+  const badgeImageUrl = badgeImage || "/assets/popu-element-img.png";
   const [selectedSize, setSelectedSize] = useState(defaultSize);
   const [name, setName]       = useState("");
   const [email, setEmail]     = useState("");
@@ -36,116 +39,174 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSize && sizes.length > 0) {
-        alert("Please select a size.");
-        return;
+      alert("Please select a size.");
+      return;
     }
 
     setIsSubmitting(true);
     try {
-        await submitEnquiry({
-            productName: productTitle,
-            size: selectedSize,
-            name: name.trim(),
-            email: email.trim(),
-            phone: phone.trim(),
-            message: message.trim(),
-        });
-        setSubmitted(true);
-        setTimeout(() => {
-            setSubmitted(false);
-            setName(""); setEmail(""); setPhone("");
-            setMessage(""); setSelectedSize("");
-            onClose();
-        }, 2500);
+      await submitEnquiry({
+        productName: productTitle,
+        size: selectedSize,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setName(""); setEmail(""); setPhone("");
+        setMessage(""); setSelectedSize("");
+        onClose();
+      }, 2500);
     } catch (err: any) {
-        alert(err.message || "Something went wrong. Please try again.");
+      alert(err.message || "Something went wrong. Please try again.");
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center">
-      <div className="relative w-[520px] h-[520px] rounded-full bg-[#f7f3ee] border-[3px] border-[#f5a623] flex flex-col items-center justify-center px-20">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 transition-all duration-300 animate-in fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          '--modal-size': 'min(94vw, 92vh, 865px)',
+        } as React.CSSProperties}
+        className="relative w-[92vw] max-w-[440px] max-h-[92vh] rounded-[24px] sm:rounded-[32px] md:w-[var(--modal-size)] md:h-[var(--modal-size)] md:max-w-none md:max-h-none md:aspect-square md:rounded-full bg-[#fbf7f2] border-[3px] sm:border-[4px] border-[#e69a28] shadow-2xl flex flex-col items-center justify-start md:justify-center p-5 sm:p-7 md:p-10 lg:p-12 overflow-y-auto md:overflow-visible animate-in zoom-in-95 duration-200 shrink-0"
+      >
+        {/* Perimeter Close Button */}
         <button
           onClick={onClose}
-          className="absolute -top-4 -right-4 w-10 h-10 bg-white rounded-full shadow flex items-center justify-center text-xl text-[#fe5722]"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-8 md:right-14 z-30 w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full shadow border border-gray-100 flex items-center justify-center text-lg sm:text-xl md:text-2xl text-[#b08237] hover:bg-gray-50 cursor-pointer transition-colors"
           aria-label="Close"
         >
           ×
         </button>
 
-        <h3 className="text-2xl font-medium mb-2 font-[family-name:var(--font-optima)]">
-          Enquire Form
-        </h3>
-        <div className="w-24 h-px bg-gray-400 mb-4" />
-
-        {submitted ? (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <div className="w-14 h-14 rounded-full bg-[#f5a623] flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <p className="text-[#5a3e10] font-semibold text-base">Enquiry Sent!</p>
-            <p className="text-gray-500 text-sm text-center">We'll get back to you shortly.</p>
+        {/* Mobile Badge Preview (Appears above heading on screens < md, never overlaps form) */}
+        <div className="md:hidden flex justify-center mb-2 shrink-0">
+          <div className="w-16 h-20 sm:w-20 sm:h-24 relative">
+            <Image
+              src={badgeImageUrl}
+              alt="Studio By Sheetal"
+              fill
+              sizes="80px"
+              className="object-contain object-bottom drop-shadow-md"
+              priority
+            />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="w-full space-y-3 text-sm">
-            <input
-              type="text"
-              value={productTitle}
-              disabled
-              className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent text-center text-xs"
-            />
+        </div>
 
-            {sizes.length > 0 && (
-              <select
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
+        {/* Form Column: Horizontally Centered on the Entire Circle's Geometric Center Axis */}
+        <div className="w-full sm:w-[85%] md:w-[54%] max-w-[425px] mx-auto flex flex-col items-center relative z-20">
+          <h3 className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-normal text-[#683e14] font-[family-name:var(--font-optima)] text-center tracking-wide leading-tight">
+            Enquire Form
+          </h3>
+
+          <div className="w-full h-px bg-gray-300 my-2 sm:my-2.5 md:my-3.5 lg:my-4" />
+
+          {submitted ? (
+            <div className="flex flex-col items-center gap-3 py-6 z-20">
+              <div className="w-16 h-16 rounded-full bg-[#f5a623] flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <p className="text-[#5a3e10] font-semibold text-lg">Enquiry Sent!</p>
+              <p className="text-gray-500 text-sm text-center">We&apos;ll get back to you shortly.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="w-full flex flex-col items-center space-y-2 sm:space-y-2.5 md:space-y-3 text-sm">
+              {/* Product Title */}
+              <input
+                type="text"
+                value={productTitle}
+                disabled
+                className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-center text-xs sm:text-sm md:text-base text-gray-800 font-medium truncate"
+              />
+
+              {/* Size Select (Preserved existing functionality) */}
+              {sizes.length > 0 && (
+                <select
+                  value={selectedSize}
+                  onChange={(e) => setSelectedSize(e.target.value)}
+                  required
+                  className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base text-gray-800 focus:outline-none focus:border-[#683e14] cursor-pointer"
+                >
+                  <option value="">Select Size</option>
+                  {sizes.map((s) => (
+                    <option key={s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Name */}
+              <input
+                type="text"
+                placeholder="Name"
                 required
-                className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent text-sm text-gray-700"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
+              />
+
+              {/* Email */}
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
+              />
+
+              {/* Phone Number */}
+              <input
+                type="text"
+                placeholder="Phone Number"
+                maxLength={10}
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
+              />
+
+              {/* Message Textarea */}
+              <textarea
+                placeholder="Message"
+                rows={2}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="w-full rounded-[18px] sm:rounded-[22px] md:rounded-[28px] border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14] h-14 sm:h-18 md:h-[86px] resize-none"
+              />
+
+              {/* Enquire Now Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="mt-2.5 sm:mt-3.5 md:mt-4 lg:mt-5 cursor-pointer block w-[150px] sm:w-[170px] md:w-[185px] lg:w-[205px] py-2 sm:py-2.5 md:py-3 lg:py-3.5 text-xs sm:text-sm md:text-base font-normal border border-black bg-transparent hover:bg-black hover:text-white transition-all text-black disabled:opacity-60 disabled:cursor-not-allowed tracking-wide text-center"
               >
-                <option value="">Select Size</option>
-                {sizes.map((s) => (
-                  <option key={s.name} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-            )}
+                {isSubmitting ? "Sending..." : "Enquire Now"}
+              </button>
+            </form>
+          )}
+        </div>
 
-            <input
-              type="text" placeholder="Name" required
-              value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent"
-            />
-            <input
-              type="email" placeholder="Email" required
-              value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent"
-            />
-            <input
-              type="text" placeholder="Phone Number" maxLength={10} required
-              value={phone} onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent"
-            />
-            <textarea
-              placeholder="Message" rows={2}
-              value={message} onChange={(e) => setMessage(e.target.value)}
-              className="w-full rounded-full border border-gray-700 px-4 py-2 bg-transparent resize-none"
-            />
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="mx-auto mt-3 cursor-pointer block w-40 py-2 text-sm font-medium border-y border-black text-black uppercase transition-all duration-500 hover:tracking-[2px] disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Sending..." : "Enquire Now"}
-            </button>
-          </form>
-        )}
-
-        <div className="absolute -bottom-2 -left-15">
-          <Image src="/assets/popu-element-img.png" alt="Saree" width={260} height={360} className="object-contain" />
+        {/* Existing Dynamic Saree / Badge Image (Desktop & Tablet: anchored bottom-left) */}
+        <div className="hidden md:block absolute -bottom-2 md:-left-40 lg:-left-60 z-10 md:w-[340px] lg:w-[460px] pointer-events-none select-none drop-shadow-2xl">
+          <Image
+            src={badgeImageUrl}
+            alt="Studio By Sheetal"
+            width={500}
+            height={750}
+            className="object-contain object-bottom"
+            priority
+          />
         </div>
       </div>
     </div>

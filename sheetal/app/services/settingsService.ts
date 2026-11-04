@@ -34,6 +34,7 @@ interface Settings {
   };
   favicon?: string;
   loginImage?: string;
+  enquiryImage?: string;
   logoHistory?: any[];
 }
 
@@ -70,11 +71,17 @@ export const getLogoUrl = (
 };
 
 export const getFaviconUrl = (settings: Settings | null): string => {
-  return settings?.favicon || "/assets/335014072.png";
+  return settings?.favicon || "/favicon.ico";
 };
 
 export const getLoginImageUrl = (
   settings?: { loginImage?: string } | Record<string, any> | null,
 ): string => {
   return settings?.loginImage || "/assets/updated-login-left.jpg";
+};
+
+export const getEnquiryImageUrl = (
+  settings?: { enquiryImage?: string } | Record<string, any> | null,
+): string => {
+  return settings?.enquiryImage || "/assets/popu-element-img.png";
 };

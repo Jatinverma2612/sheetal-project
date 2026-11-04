@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe, Mail, Phone, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/admin/layout/PageHeader.js";
-import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon, updateLoginImage } from "@/services/settingsService";
+import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon, updateLoginImage, updateEnquiryImage } from "@/services/settingsService";
 
 export default function SettingsPage() {
   const inputStyle =
@@ -23,9 +23,11 @@ export default function SettingsPage() {
     logo: null,
     favicon: "",
     loginImage: "",
+    enquiryImage: "",
     logoHistory: [],
   });
   const [isUploadingLoginImage, setIsUploadingLoginImage] = useState(false);
+  const [isUploadingEnquiryImage, setIsUploadingEnquiryImage] = useState(false);
 
   const [contactSettings, setContactSettings] = useState({
     supportEmail: "info@studiobysheetal.com",
@@ -60,6 +62,7 @@ export default function SettingsPage() {
           logo: settingsRes.data.logo || null,
           favicon: settingsRes.data.favicon || "",
           loginImage: settingsRes.data.loginImage || "",
+          enquiryImage: settingsRes.data.enquiryImage || "",
           logoHistory: settingsRes.data.logoHistory || [],
         });
 
@@ -229,6 +232,45 @@ export default function SettingsPage() {
     }
   };
 
+  const handleEnquiryImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+    if (!isPng) {
+      toast.error("Please upload a transparent PNG image only (.png)");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be under 5MB");
+      return;
+    }
+
+    setIsUploadingEnquiryImage(true);
+    const formData = new FormData();
+    formData.append("enquiryImage", file);
+
+    try {
+      const res = await updateEnquiryImage(formData);
+      if (res.success) {
+        toast.success("Enquiry badge image updated successfully!");
+        setBrandSettings((prev) => ({
+          ...prev,
+          enquiryImage: res.data.enquiryImage,
+        }));
+      } else {
+        toast.error(res.message || "Failed to update enquiry badge image");
+      }
+    } catch (error) {
+      toast.error("Failed to upload enquiry badge image");
+    } finally {
+      setIsUploadingEnquiryImage(false);
+      e.target.value = "";
+    }
+  };
+
   const handleRestoreLogo = async (historyId) => {
     if (!confirm("Are you sure you want to restore this version?")) return;
 
@@ -383,6 +425,40 @@ export default function SettingsPage() {
                         accept="image/*"
                         onChange={handleLoginImageUpload}
                         disabled={isUploadingLoginImage}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Enquiry Modal Badge Upload */}
+              <div className="space-y-4">
+                <label className={labelStyle}>Enquiry Modal Badge Image</label>
+                <div className="flex items-start gap-6">
+                  <div className="h-28 w-20 shrink-0 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center p-2 overflow-hidden">
+                    <img
+                      src={brandSettings.enquiryImage || "/assets/popu-element-img.png"}
+                      alt="Enquiry Badge"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Decorative badge displayed on the storefront product Enquire Form modal.
+                    </p>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800 disabled:opacity-70">
+                      {isUploadingEnquiryImage ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Upload size={12} />
+                      )}
+                      {isUploadingEnquiryImage ? "Uploading..." : "Upload Badge"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/png"
+                        onChange={handleEnquiryImageUpload}
+                        disabled={isUploadingEnquiryImage}
                       />
                     </label>
                   </div>

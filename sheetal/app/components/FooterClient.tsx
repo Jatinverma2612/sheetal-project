@@ -183,6 +183,7 @@ const FooterClient = ({
                   width={180}
                   height={120}
                   className="lg:mx-0 h-[120px] w-[180px] object-contain"
+                  suppressHydrationWarning
                 />
               </Link>
               <div className="flex justify-center gap-3 text-[#f8f0b6]">
