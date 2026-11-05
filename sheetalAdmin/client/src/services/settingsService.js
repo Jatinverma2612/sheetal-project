@@ -3,12 +3,17 @@ import { API_BASE_URL } from "./api";
 
 // Get global settings
 export const getSettings = async () => {
-    const token = localStorage.getItem("token");
-    const response = await axios.get(`${API_BASE_URL}/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-    });
-    return response.data;
+    try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const response = await axios.get(`${API_BASE_URL}/settings`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            withCredentials: true,
+        });
+        return response.data;
+    } catch (error) {
+        console.warn("Failed to fetch settings:", error?.message || error);
+        return { success: false, data: null, error: error?.message || "Network Error" };
+    }
 };
 
 // Update global settings

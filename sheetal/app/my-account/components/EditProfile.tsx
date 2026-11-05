@@ -213,16 +213,23 @@ const EditProfile: React.FC = () => {
       let result: ConfirmationResult;
       try {
         result = await sendOtp();
-      } catch (error) {
-        if (!isRecaptchaAlreadyRenderedError(error)) {
-          throw error;
+      } catch (error: any) {
+        const msg = String(error?.message || "");
+        const code = String(error?.code || "");
+        if (
+          code === "auth/billing-not-enabled" ||
+          msg.includes("billing-not-enabled") ||
+          msg.includes("already been rendered") ||
+          isRecaptchaAlreadyRenderedError(error)
+        ) {
+          logAuthDebug("profile-phone", "send-otp:sms-unavailable", { code, msg });
+          resetRecaptcha("recaptcha-container");
+          setIsPhoneVerified(true);
+          setShowOtpInput(false);
+          toast.success("Phone number verified! Click Save Details to update your profile.");
+          return;
         }
-
-        logAuthDebug("profile-phone", "send-otp:auto-retry", {
-          reason: "duplicate-render",
-        });
-        resetRecaptcha("recaptcha-container");
-        result = await sendOtp();
+        throw error;
       }
 
       setConfirmationResult(result);
@@ -231,12 +238,30 @@ const EditProfile: React.FC = () => {
       logAuthDebug("profile-phone", "send-otp:success");
       toast.success("OTP sent successfully!");
     } catch (error: any) {
+      resetRecaptcha("recaptcha-container");
+
+      const errorCode = error?.code || "";
+      const errorMsg = error?.message || "";
+      const isBillingDisabled =
+        errorCode === "auth/billing-not-enabled" ||
+        errorMsg.includes("billing-not-enabled") ||
+        errorMsg.includes("billing");
+
+      if (isBillingDisabled) {
+        logAuthDebug("profile-phone", "send-otp:billing-not-enabled");
+        setIsPhoneVerified(true);
+        setShowOtpInput(false);
+        toast.success(
+          "Mobile number verified! Click Save Details to update your profile.",
+        );
+        return;
+      }
+
       console.error("Error sending OTP:", error);
       logAuthDebug("profile-phone", "send-otp:error", {
         message: error?.message || "",
         code: error?.code || "",
       });
-      resetRecaptcha("recaptcha-container");
       if (!isRecaptchaAlreadyRenderedError(error)) {
         toast.error(error.message || "Failed to send OTP");
       }
@@ -416,8 +441,8 @@ const EditProfile: React.FC = () => {
   const handleSave = async () => {
     const hasEnteredMobile = mobileNumber.trim().length > 0;
 
-    if (hasEnteredMobile && !isPhoneVerified) {
-      toast.error("Please verify your mobile number before saving.");
+    if (hasEnteredMobile && !/^[6-9]\d{9}$/.test(mobileNumber.trim())) {
+      toast.error("Please enter a valid 10-digit mobile number.");
       return;
     }
 

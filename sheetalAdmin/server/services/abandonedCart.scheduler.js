@@ -2,7 +2,7 @@ import Cart from "../models/cart.model.js";
 import Settings from "../models/settings.model.js";
 import { config } from "../config/config.js";
 import logger from "../utils/logger.js";
-import { REMINDER_STAGES } from "../constants/abandonedCart.constants.js";
+import { REMINDER_STAGES, ABANDONED_CART_SCHEDULE } from "../constants/abandonedCart.constants.js";
 import {
   claimReminderStageLease,
   releaseReminderStageLease,
@@ -26,16 +26,21 @@ const loadReminderPolicy = async () => {
       settings?.abandonedCartInactivityMinutes ??
         config.abandonedCart.inactivityMinutes,
       1,
-      30,
+      1440,
     ),
     discountPercent: clamp(
       settings?.abandonedCartDiscountPercent ??
         config.abandonedCart.discountPercent,
-      5,
-      10,
+      1,
+      90,
     ),
     couponCode:
       settings?.abandonedCartCouponCode || config.abandonedCart.couponCode,
+    schedule:
+      Array.isArray(settings?.abandonedCartSchedule) &&
+      settings.abandonedCartSchedule.length > 0
+        ? settings.abandonedCartSchedule
+        : ABANDONED_CART_SCHEDULE,
   };
 };
 
@@ -67,9 +72,13 @@ export const processDueAbandonedCarts = async () => {
     );
 
     const dueActiveCarts = await Cart.find({
-      abandonmentStatus: "active",
+      abandonmentStatus: { $nin: ["abandoned", "completed"] },
       "items.0": { $exists: true },
-      lastActivityAt: { $lte: activeCutoff },
+      $or: [
+        { lastActivityAt: { $lte: activeCutoff } },
+        { lastActivityAt: { $exists: false }, updatedAt: { $lte: activeCutoff } },
+        { lastActivityAt: null, updatedAt: { $lte: activeCutoff } },
+      ],
     })
       .select("_id abandonmentCycleId")
       .lean();
@@ -97,7 +106,7 @@ export const processDueAbandonedCarts = async () => {
 
       const abandonedAt = new Date(cart.abandonedAt);
 
-      for (const reminder of REMINDER_STAGES) {
+      for (const reminder of policy.schedule) {
         const dueAt = new Date(
           abandonedAt.getTime() + reminder.delayMinutes * 60 * 1000,
         );
@@ -175,7 +184,7 @@ export const processDueAbandonedCarts = async () => {
 };
 
 export const initializeAbandonedCartScheduler = () => {
-  if (process.env.ENABLE_ABANDONED_CART_SCHEDULER !== "true") {
+  if (process.env.ENABLE_ABANDONED_CART_SCHEDULER === "false") {
     logger.info(
       "[AbandonedCart] Scheduler disabled by default (set ENABLE_ABANDONED_CART_SCHEDULER=true to enable)",
     );

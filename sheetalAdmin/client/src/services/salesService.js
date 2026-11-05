@@ -103,3 +103,21 @@ export const getAbandonedCarts = async (
   });
   return handleResponse(res);
 };
+
+export const getAbandonedCartSettings = async () => {
+  const res = await fetch(`${API_BASE_URL}/abandoned-cart/settings`, {
+    method: "GET",
+    credentials: "include",
+  });
+  return handleResponse(res);
+};
+
+export const updateAbandonedCartSettings = async (settingsData) => {
+  const res = await fetch(`${API_BASE_URL}/abandoned-cart/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(settingsData),
+  });
+  return handleResponse(res);
+};

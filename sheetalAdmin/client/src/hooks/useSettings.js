@@ -16,30 +16,46 @@ export default function useSettings() {
     }
 
     if (!promise) {
-      promise = getSettings().then((res) => {
-        if (res.success) {
-          cachedSettings = res.data;
-          return res.data;
-        }
-        return null;
-      });
+      promise = getSettings()
+        .then((res) => {
+          if (res?.success) {
+            cachedSettings = res.data;
+            return res.data;
+          }
+          return null;
+        })
+        .catch((err) => {
+          console.warn("Could not load settings:", err?.message || err);
+          promise = null;
+          return null;
+        });
     }
 
-    promise.then((data) => {
-      setSettings(data);
-      setLoading(false);
-    });
+    promise
+      .then((data) => {
+        setSettings(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
   }, []);
 
   const refreshSettings = async () => {
-    promise = getSettings().then((res) => {
-      if (res.success) {
-        cachedSettings = res.data;
-        setSettings(res.data);
-        return res.data;
-      }
-      return null;
-    });
+    promise = getSettings()
+      .then((res) => {
+        if (res?.success) {
+          cachedSettings = res.data;
+          setSettings(res.data);
+          return res.data;
+        }
+        return null;
+      })
+      .catch((err) => {
+        console.warn("Could not refresh settings:", err?.message || err);
+        promise = null;
+        return null;
+      });
     return promise;
   };
 

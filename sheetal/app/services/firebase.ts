@@ -213,7 +213,15 @@ export const setupInvisibleRecaptcha = async (containerId: string) => {
       logAuthDebug("recaptcha", "setup:retry-after-duplicate-render", {
         containerId,
       });
-      return createVerifier();
+      try {
+        return await createVerifier();
+      } catch (retryErr) {
+        logAuthDebug("recaptcha", "setup:retry-failed", { error: String(retryErr) });
+        if (recaptchaWindow.recaptchaVerifier) {
+          return recaptchaWindow.recaptchaVerifier;
+        }
+        throw retryErr;
+      }
     }
 
     throw error;

@@ -11,6 +11,7 @@ import {
   Clock,
   TrendingUp,
   Eye,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import ReportExportMenu from "@/components/admin/common/ReportExportMenu";
 import DateRangeControl from "@/components/admin/common/DateRangeControl";
@@ -43,6 +44,7 @@ export default function AbandonedCartsPage() {
   const [error, setError] = useState(null);
   const [selectedCart, setSelectedCart] = useState(null);
   const [isStepsModalOpen, setIsStepsModalOpen] = useState(false);
+  const [initialStepEditMode, setInitialStepEditMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [stats, setStats] = useState({
@@ -232,7 +234,21 @@ export default function AbandonedCartsPage() {
             />
             <button
               type="button"
-              onClick={() => setIsStepsModalOpen(true)}
+              onClick={() => {
+                setInitialStepEditMode(true);
+                setIsStepsModalOpen(true);
+              }}
+              className="flex items-center cursor-pointer gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 text-sm font-bold transition-all active:scale-95 shadow-sm"
+            >
+              <SettingsIcon size={14} />
+              Configure
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInitialStepEditMode(false);
+                setIsStepsModalOpen(true);
+              }}
               className="flex items-center cursor-pointer gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:border-slate-400 active:scale-95"
             >
               Steps Details
@@ -461,6 +477,8 @@ export default function AbandonedCartsPage() {
         isOpen={isStepsModalOpen}
         onClose={() => setIsStepsModalOpen(false)}
         coupons={coupons}
+        initialEditMode={initialStepEditMode}
+        onSaved={() => fetchData()}
       />
     </div>
   );

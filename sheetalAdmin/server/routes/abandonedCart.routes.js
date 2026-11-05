@@ -3,6 +3,9 @@ import { isAuthenticated, isAdmin } from "../middlewares/auth.middleware.js";
 import successResponse from "../utils/successResponse.js";
 import Cart from "../models/cart.model.js";
 import Coupon from "../models/coupon.model.js";
+import Settings from "../models/settings.model.js";
+import { ABANDONED_CART_SCHEDULE } from "../constants/abandonedCart.constants.js";
+import { config } from "../config/config.js";
 import {
   getValidAbandonedCartCouponForUser,
   validateAndApplyAbandonedCartCoupon,
@@ -135,6 +138,137 @@ router.post("/push-coupon", isAdmin, async (req, res, next) => {
       200,
       { count: succeeded, failed },
       `Coupon pushed to ${succeeded} abandoned cart${succeeded !== 1 ? "s" : ""}${failed > 0 ? ` (${failed} failed)` : ""}`,
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── GET /settings ─────────────────────────────────────────────────────────
+// Fetch current abandoned cart recovery configuration
+router.get("/settings", isAuthenticated, isAdmin, async (req, res, next) => {
+  try {
+    const settings = await Settings.findOne().lean();
+    const data = {
+      inactivityMinutes:
+        settings?.abandonedCartInactivityMinutes ??
+        config.abandonedCart?.inactivityMinutes ??
+        20,
+      discountPercent:
+        settings?.abandonedCartDiscountPercent ??
+        config.abandonedCart?.discountPercent ??
+        10,
+      couponCode:
+        settings?.abandonedCartCouponCode ||
+        config.abandonedCart?.couponCode ||
+        "SAVE10",
+      schedule:
+        Array.isArray(settings?.abandonedCartSchedule) &&
+        settings.abandonedCartSchedule.length > 0
+          ? settings.abandonedCartSchedule
+          : ABANDONED_CART_SCHEDULE,
+    };
+    return successResponse(
+      res,
+      200,
+      data,
+      "Abandoned cart settings fetched successfully",
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── PUT /settings ─────────────────────────────────────────────────────────
+// Update abandoned cart recovery configuration
+router.put("/settings", isAuthenticated, isAdmin, async (req, res, next) => {
+  try {
+    const { inactivityMinutes, discountPercent, couponCode, schedule } =
+      req.body || {};
+
+    const updates = {};
+    if (inactivityMinutes !== undefined) {
+      updates.abandonedCartInactivityMinutes = Math.min(
+        1440,
+        Math.max(1, Number(inactivityMinutes) || 20),
+      );
+    }
+    if (discountPercent !== undefined) {
+      updates.abandonedCartDiscountPercent = Math.min(
+        90,
+        Math.max(1, Number(discountPercent) || 10),
+      );
+    }
+    if (couponCode !== undefined && typeof couponCode === "string") {
+      updates.abandonedCartCouponCode = couponCode.trim().toUpperCase();
+    }
+    if (Array.isArray(schedule) && schedule.length > 0) {
+      updates.abandonedCartSchedule = schedule.map((step, idx) => ({
+        step: Number(step.step) || idx + 1,
+        stage:
+          step.stage ||
+          (idx === 0
+            ? "first"
+            : idx === 1
+              ? "second"
+              : idx === 2
+                ? "third"
+                : "final"),
+        label: step.label || `Step ${idx + 1}`,
+        title: step.title || `${step.delayMinutes || 1} min reminder`,
+        modalTitle:
+          step.modalTitle || `${step.delayMinutes || 1} Minute Reminder`,
+        timing:
+          step.timing ||
+          `After ${step.delayMinutes || 1} minute${Number(step.delayMinutes) !== 1 ? "s" : ""}`,
+        delayMinutes: Math.max(1, Number(step.delayMinutes) || 1),
+        channels:
+          Array.isArray(step.channels) && step.channels.length > 0
+            ? step.channels
+            : ["email"],
+        tone:
+          step.tone ||
+          (idx === 0
+            ? "Soft Reminder"
+            : idx === 1
+              ? "Warm Follow-up"
+              : idx === 2
+                ? "Coupon Offer"
+                : "Last Chance"),
+        accent:
+          step.accent ||
+          (idx === 0
+            ? "rose"
+            : idx === 1
+              ? "amber"
+              : idx === 2
+                ? "emerald"
+                : "slate"),
+        coupon: Boolean(step.coupon),
+        description: step.description || "",
+      }));
+    }
+
+    const updated = await Settings.findOneAndUpdate({}, updates, {
+      new: true,
+      upsert: true,
+    });
+
+    logger.info(
+      { updates: Object.keys(updates) },
+      "[AbandonedCart] Settings updated by admin",
+    );
+
+    return successResponse(
+      res,
+      200,
+      {
+        inactivityMinutes: updated.abandonedCartInactivityMinutes,
+        discountPercent: updated.abandonedCartDiscountPercent,
+        couponCode: updated.abandonedCartCouponCode,
+        schedule: updated.abandonedCartSchedule || ABANDONED_CART_SCHEDULE,
+      },
+      "Abandoned cart settings updated successfully",
     );
   } catch (error) {
     next(error);

@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import Order from "../models/order.model.js";
 import Cart from "../models/cart.model.js";
 import User from "../models/user.model.js";
 import Product from "../models/product.model.js";
+import Settings from "../models/settings.model.js";
 import {
   ABANDONED_CART_STEPS,
   ABANDONED_CART_RECOVERY_STEPS,
@@ -21,7 +23,15 @@ const formatRelativeAbandonedDate = (value) => {
   });
 };
 
-const summarizeAttemptChannels = (attempt = {}) => {
+const summarizeAttemptChannels = (attempt = null, defaultChannels = []) => {
+  if (!attempt) {
+    return (defaultChannels || []).map((channel) => ({
+      channel,
+      status: "pending",
+      error: null,
+    }));
+  }
+
   const channelEntries = Array.isArray(attempt?.metadata?.channels)
     ? attempt.metadata.channels
     : [];
@@ -40,7 +50,7 @@ const summarizeAttemptChannels = (attempt = {}) => {
     }));
   }
 
-  return (attempt.channels || []).map((channel) => ({
+  return (attempt?.channels?.length ? attempt.channels : defaultChannels || []).map((channel) => ({
     channel,
     status:
       attempt.status === "success"
@@ -49,19 +59,34 @@ const summarizeAttemptChannels = (attempt = {}) => {
           ? "quarantined"
           : attempt.status === "failure"
             ? "failed"
-            : "skipped",
+            : attempt.status === "pending"
+              ? "pending"
+              : "skipped",
     error: attempt.error || null,
   }));
 };
 
-const buildReminderCheckpoints = (cart) => {
-  const attempts = Array.isArray(cart.abandonmentReminderAttempts)
+const buildReminderCheckpoints = (cart, activeSchedule = ABANDONED_CART_STEPS) => {
+  const allAttempts = Array.isArray(cart.abandonmentReminderAttempts)
     ? cart.abandonmentReminderAttempts
     : [];
+
+  const cycleId = cart.abandonmentCycleId;
+  const cycleAttempts = cycleId
+    ? allAttempts.filter((entry) => entry?.cycleId === cycleId)
+    : allAttempts;
+
+  // Restrict to the cart's active cycle when available so stale failures from
+  // earlier abandoned cycles (weeks/months ago) are not displayed.
+  const relevantAttempts = cycleId ? cycleAttempts : allAttempts;
   const abandonedAt = cart.abandonedAt || cart.updatedAt || new Date();
 
-  return ABANDONED_CART_STEPS.map((step) => {
-    const attempt = attempts.find((entry) => entry.stage === step.stage);
+  return activeSchedule.map((step) => {
+    const stageAttempts = relevantAttempts.filter(
+      (entry) => entry?.stage === step.stage,
+    );
+    // Select the latest attempt for this stage in this cycle
+    const attempt = stageAttempts[stageAttempts.length - 1] || null;
     const scheduledFor = new Date(
       new Date(abandonedAt).getTime() + step.delayMinutes * 60 * 1000,
     );
@@ -72,7 +97,7 @@ const buildReminderCheckpoints = (cart) => {
       scheduledFor,
       attemptedAt: attempt?.attemptedAt || null,
       completedAt: attempt?.completedAt || null,
-      channels: summarizeAttemptChannels(attempt),
+      channels: summarizeAttemptChannels(attempt, step.channels),
       error: attempt?.error || null,
     };
   });
@@ -591,7 +616,13 @@ const buildCartDateMatch = (status, startDate, endDate) => {
   if (!range) return null;
 
   return {
-    [status === "completed" ? "completedAt" : "abandonedAt"]: range,
+    $or: [
+      { [status === "completed" ? "completedAt" : "abandonedAt"]: range },
+      {
+        [status === "completed" ? "completedAt" : "abandonedAt"]: null,
+        updatedAt: range,
+      },
+    ],
   };
 };
 
@@ -663,7 +694,10 @@ export const getAbandonedCarts = async (req, res) => {
       recoveryMatch.recoveredAt = recoveryDateRange;
     }
 
-    const [carts, recoveryStats] = await Promise.all([
+    const [settings, carts, recoveryStats] = await Promise.all([
+      mongoose.connection?.readyState === 1
+        ? Settings.findOne().lean().catch(() => null)
+        : null,
       Cart.find(cartMatch)
         .populate("user", "name email phoneNumber")
         .populate("items.product", "name images mainImage slug")
@@ -715,6 +749,12 @@ export const getAbandonedCarts = async (req, res) => {
       });
     }
 
+    const activeSchedule =
+      Array.isArray(settings?.abandonedCartSchedule) &&
+      settings.abandonedCartSchedule.length > 0
+        ? settings.abandonedCartSchedule
+        : ABANDONED_CART_STEPS;
+
     const data = carts
       .map((cart) => {
         const cartValue = cart.items.reduce((sum, item) => {
@@ -754,7 +794,7 @@ export const getAbandonedCarts = async (req, res) => {
           };
         });
 
-        const checkpoints = buildReminderCheckpoints(cart);
+        const checkpoints = buildReminderCheckpoints(cart, activeSchedule);
         const recoveryRecord = recoveryByCartId.get(String(cart._id)) || null;
         const recoveredAtStage =
           recoveryRecord?.recoveryStage || cart.recoveredAtStage || null;
@@ -787,7 +827,11 @@ export const getAbandonedCarts = async (req, res) => {
             ) / 100,
           status,
           abandonmentReason: cart.abandonmentReason || "inactivity",
-          reminderAttemptsCount: cart.abandonmentReminderAttempts?.length || 0,
+          reminderAttemptsCount: (cart.abandonmentCycleId
+            ? (cart.abandonmentReminderAttempts || []).filter(
+                (entry) => entry?.cycleId === cart.abandonmentCycleId,
+              )
+            : (cart.abandonmentReminderAttempts || [])).length,
           checkpoints,
           items,
           previewImage: items[0]?.image || null,

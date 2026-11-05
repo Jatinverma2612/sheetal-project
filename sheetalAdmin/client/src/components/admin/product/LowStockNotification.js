@@ -28,9 +28,11 @@ const LowStockNotification = () => {
     const fetchLowStockProducts = async () => {
       try {
         const res = await getLowStockProducts();
-        if (res.success) {
-          setLowStockProducts(res.data);
+        if (res?.success) {
+          setLowStockProducts(res.data || []);
         }
+      } catch (err) {
+        console.warn("Could not fetch low stock products:", err?.message || err);
       } finally {
         setLoading(false);
       }

@@ -284,7 +284,11 @@ function CheckpointCard({ checkpoint, isLast }) {
 
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-500">
             <p>Scheduled for {formatDateTime(checkpoint.scheduledFor)}</p>
-            <p>Processed at {formatDateTime(checkpoint.completedAt || checkpoint.attemptedAt)}</p>
+            {checkpoint.completedAt || checkpoint.attemptedAt ? (
+              <p>Processed at {formatDateTime(checkpoint.completedAt || checkpoint.attemptedAt)}</p>
+            ) : (
+              <p className="text-slate-400">Not processed yet</p>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">

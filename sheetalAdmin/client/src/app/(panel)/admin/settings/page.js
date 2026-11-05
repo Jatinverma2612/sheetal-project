@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe, Mail, Phone, MessageSquare } from "lucide-react";
+import Link from "next/link";
+import { CreditCard, Save, Loader2, RefreshCw, Palette, Upload, History, Globe, Mail, Phone, MessageSquare, ShoppingCart } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/admin/layout/PageHeader.js";
 import { getSettings, updateSettings, updateLogo, restoreLogo, updateFavicon, updateLoginImage, updateEnquiryImage } from "@/services/settingsService";
@@ -17,6 +18,9 @@ export default function SettingsPage() {
     freeShippingThreshold: 0,
     taxPercentage: 0,
     globalHsnCode: "",
+    abandonedCartInactivityMinutes: 20,
+    abandonedCartDiscountPercent: 10,
+    abandonedCartCouponCode: "SAVE10",
   });
 
   const [brandSettings, setBrandSettings] = useState({
@@ -56,6 +60,12 @@ export default function SettingsPage() {
           freeShippingThreshold: settingsRes.data.freeShippingThreshold || 0,
           taxPercentage: settingsRes.data.taxPercentage || 0,
           globalHsnCode: settingsRes.data.globalHsnCode || "",
+          abandonedCartInactivityMinutes:
+            settingsRes.data.abandonedCartInactivityMinutes ?? 20,
+          abandonedCartDiscountPercent:
+            settingsRes.data.abandonedCartDiscountPercent ?? 10,
+          abandonedCartCouponCode:
+            settingsRes.data.abandonedCartCouponCode || "SAVE10",
         });
 
         setBrandSettings({
@@ -97,7 +107,10 @@ export default function SettingsPage() {
     const { name, value } = e.target;
     setGlobalSettings((prev) => ({
       ...prev,
-      [name]: name === "globalHsnCode" ? value : Number(value),
+      [name]:
+        name === "globalHsnCode" || name === "abandonedCartCouponCode"
+          ? value
+          : Number(value),
     }));
   };
 
@@ -601,6 +614,75 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* --- Abandoned Cart Recovery Settings --- */}
+        <div className="bg-white p-6 md:p-8 rounded-[28px] border border-slate-200 shadow-sm space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <ShoppingCart size={18} className="text-rose-500" /> Abandoned Cart Recovery
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                Configure inactivity thresholds and recovery discount offers for the automated 4-step sequence.
+              </p>
+            </div>
+            <Link
+              href="/admin/sales-report/abandoned-carts"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm"
+            >
+              Open Recovery Dashboard &rarr;
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1.5">
+              <label className={labelStyle}>Inactivity Threshold (Minutes)</label>
+              <input
+                type="number"
+                name="abandonedCartInactivityMinutes"
+                min="1"
+                max="1440"
+                value={globalSettings.abandonedCartInactivityMinutes}
+                onChange={handleGlobalSettingChange}
+                className={inputStyle}
+              />
+              <p className="text-[10px] text-slate-400">
+                Minutes before an idle cart is marked abandoned.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className={labelStyle}>Recovery Coupon Code</label>
+              <input
+                type="text"
+                name="abandonedCartCouponCode"
+                value={globalSettings.abandonedCartCouponCode}
+                onChange={handleGlobalSettingChange}
+                className={inputStyle}
+                placeholder="SAVE10"
+              />
+              <p className="text-[10px] text-slate-400">
+                Auto-applied in Step 3 recovery checkout link.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className={labelStyle}>Recovery Discount (%)</label>
+              <input
+                type="number"
+                name="abandonedCartDiscountPercent"
+                min="1"
+                max="90"
+                value={globalSettings.abandonedCartDiscountPercent}
+                onChange={handleGlobalSettingChange}
+                className={inputStyle}
+              />
+              <p className="text-[10px] text-slate-400">
+                Discount percentage offered to customer.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* --- Contact Us & Support Details --- */}

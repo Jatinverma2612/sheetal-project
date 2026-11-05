@@ -145,11 +145,16 @@ export const getProductDetails = async (id) => {
 };
 
 export const getLowStockProducts = async () => {
-  const res = await fetch(`${API_BASE_URL}/products/admin/low-stock`, {
-    credentials: "include",
-    headers: getAuthHeaders(),
-  });
-  return handleResponse(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/products/admin/low-stock`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return await handleResponse(res);
+  } catch (err) {
+    console.warn("Failed to fetch low stock products:", err?.message || err);
+    return { success: false, data: [] };
+  }
 };
 
 export const getAdminReviews = async (page = 1, limit = 50, status = "all") => {

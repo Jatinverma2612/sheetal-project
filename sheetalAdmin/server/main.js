@@ -183,6 +183,7 @@ app.use(`${BASE_URL}/api/v1/lookbooks`, lookbookRoutes);
 app.use(`${BASE_URL}/api/v1/pages`, pagesRoutes);
 app.use(`${BASE_URL}/api/v1/payment`, paymentRoutes);
 app.use(`${BASE_URL}/api/v1/abandoned-cart`, abandonedCartRoutes);
+app.use(`${BASE_URL}/api/v1/abandoned-carts`, abandonedCartRoutes);
 app.use(`${BASE_URL}/api/v1/shared-cart`, sharedCartRoutes);
 app.use(`${BASE_URL}/api/v1/sales`, salesRouter);
 app.use(`${BASE_URL}/api/v1/instacards`, instaRouter);

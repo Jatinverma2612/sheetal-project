@@ -4,6 +4,7 @@ export const DATE_RANGE_PRESETS = [
   { value: "last_7_days", label: "Last 7 days" },
   { value: "last_30_days", label: "Last 30 days" },
   { value: "last_365_days", label: "Last 365 days" },
+  { value: "all_time", label: "All time" },
   { value: "custom", label: "Custom date" },
 ];
 
@@ -34,7 +35,12 @@ export const getRelativeDateRange = (preset = "last_7_days", baseDate = new Date
   const endDate = endOfDay(baseDate);
   const startDate = new Date(endDate);
 
-  if (preset === "last_365_days") {
+  if (preset === "all_time") {
+    return {
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      endDate,
+    };
+  } else if (preset === "last_365_days") {
     startDate.setDate(startDate.getDate() - 364);
   } else if (preset === "last_30_days") {
     startDate.setDate(startDate.getDate() - 29);
@@ -88,6 +94,7 @@ export const formatDateRangeLabel = ({ startDate, endDate } = {}) => {
 };
 
 export const getDateRangePreviewLabel = (rangeType = "last_7_days") => {
+  if (rangeType === "all_time") return "All time";
   if (rangeType === "last_30_days") return "Last 30 days";
   if (rangeType === "last_365_days") return "Last 365 days";
   if (rangeType === "custom") return "Custom date";

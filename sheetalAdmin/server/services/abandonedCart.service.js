@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Cart from "../models/cart.model.js";
 import User from "../models/user.model.js";
 import Settings from "../models/settings.model.js";
+import Product from "../models/product.model.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 import logger from "../utils/logger.js";
 import { config } from "../config/config.js";
