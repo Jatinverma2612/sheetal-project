@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import { sendReminder } from "../services/abandonedCart.service.js";
+import { buildReminderCheckpoints } from "../controllers/sales.controller.js";
 import express from "express";
 import { isAuthenticated, isAdmin } from "../middlewares/auth.middleware.js";
 import successResponse from "../utils/successResponse.js";
@@ -269,6 +272,71 @@ router.put("/settings", isAuthenticated, isAdmin, async (req, res, next) => {
         schedule: updated.abandonedCartSchedule || ABANDONED_CART_SCHEDULE,
       },
       "Abandoned cart settings updated successfully",
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ── POST /retry-stage ─────────────────────────────────────────────────────
+// Admin only. Retries sending a reminder for a specific stage of an abandoned cart.
+router.post("/retry-stage", isAuthenticated, isAdmin, async (req, res, next) => {
+  try {
+    const { cartId, stage } = req.body || {};
+
+    if (!cartId || !stage) {
+      return res.status(400).json({
+        success: false,
+        message: "cartId and stage are required",
+      });
+    }
+
+    const cart = await Cart.findById(cartId).populate(
+      "user",
+      "name email phoneNumber alternativeMobileNumber",
+    );
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found",
+      });
+    }
+
+    if (cart.abandonmentStatus === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Cart is already recovered/completed",
+      });
+    }
+
+    const cycleId = cart.abandonmentCycleId || crypto.randomUUID();
+    const jobId = `abandoned-cart-${cart._id}-${cycleId}-${stage}-retry-${Date.now()}`;
+
+    const result = await sendReminder({
+      cartId: cart._id.toString(),
+      cycleId,
+      stage,
+      jobId,
+      abandonedAt: cart.abandonedAt || cart.updatedAt,
+    });
+
+    const refreshedCart = await Cart.findById(cart._id).populate(
+      "user",
+      "name email phoneNumber alternativeMobileNumber",
+    );
+
+    const checkpoints = buildReminderCheckpoints(refreshedCart);
+
+    return successResponse(
+      res,
+      200,
+      {
+        result,
+        checkpoints,
+      },
+      `Stage ${stage} reminder retried: ${result.status}`,
     );
   } catch (error) {
     next(error);

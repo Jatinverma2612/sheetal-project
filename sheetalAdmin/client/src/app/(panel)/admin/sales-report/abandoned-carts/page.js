@@ -472,6 +472,7 @@ export default function AbandonedCartsPage() {
         cart={selectedCart}
         isOpen={Boolean(selectedCart)}
         onClose={() => setSelectedCart(null)}
+        onRefresh={fetchData}
       />
       <AbandonedCartStepsModal
         isOpen={isStepsModalOpen}

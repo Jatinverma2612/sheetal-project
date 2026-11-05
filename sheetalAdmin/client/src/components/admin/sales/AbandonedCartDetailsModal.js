@@ -1,6 +1,17 @@
 "use client";
 
-import { X, CheckCircle2, Clock3, CircleDashed, AlertTriangle, Ban, ShieldAlert } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  X,
+  CheckCircle2,
+  Clock3,
+  CircleDashed,
+  AlertTriangle,
+  Ban,
+  ShieldAlert,
+  RefreshCw,
+} from "lucide-react";
+import { retryAbandonedCartStage } from "@/services/salesService";
 
 const STATUS_STYLES = {
   success: {
@@ -66,8 +77,52 @@ const formatStatus = (value) => {
   return "Abandoned";
 };
 
-export default function AbandonedCartDetailsModal({ cart, isOpen, onClose }) {
+export default function AbandonedCartDetailsModal({ cart, isOpen, onClose, onRefresh }) {
+  const [retryingStage, setRetryingStage] = useState(null);
+  const [localCheckpoints, setLocalCheckpoints] = useState(cart?.checkpoints || []);
+  const [retryMessage, setRetryMessage] = useState(null);
+
+  useEffect(() => {
+    setLocalCheckpoints(cart?.checkpoints || []);
+    setRetryMessage(null);
+  }, [cart]);
+
   if (!isOpen || !cart) return null;
+
+  const handleRetryStage = async (stage) => {
+    const cartId = cart.mongoCartId || cart.cartId || cart._id;
+    if (!cartId || !stage) return;
+    setRetryingStage(stage);
+    setRetryMessage(null);
+
+    try {
+      const res = await retryAbandonedCartStage(cartId, stage);
+      if (res?.success) {
+        if (res.data?.checkpoints) {
+          setLocalCheckpoints(res.data.checkpoints);
+        }
+        setRetryMessage({
+          type: "success",
+          text: `Stage ${stage} reminder dispatched successfully!`,
+        });
+        if (typeof onRefresh === "function") {
+          onRefresh();
+        }
+      } else {
+        setRetryMessage({
+          type: "error",
+          text: res?.message || "Failed to retry stage reminder",
+        });
+      }
+    } catch (err) {
+      setRetryMessage({
+        type: "error",
+        text: err.message || "Failed to retry stage reminder",
+      });
+    } finally {
+      setRetryingStage(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/55 p-4 sm:p-6">
@@ -218,14 +273,27 @@ export default function AbandonedCartDetailsModal({ cart, isOpen, onClose }) {
                 <p className="mt-2 text-sm text-slate-500">
                   Each checkpoint shows whether the reminder was sent, skipped, failed, or is still pending.
                 </p>
+                {retryMessage && (
+                  <div
+                    className={`mt-3 rounded-2xl p-3 text-xs font-semibold border ${
+                      retryMessage.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-rose-200 bg-rose-50 text-rose-800"
+                    }`}
+                  >
+                    {retryMessage.text}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
-                {(cart.checkpoints || []).map((checkpoint, index) => (
+                {(localCheckpoints || []).map((checkpoint, index) => (
                   <CheckpointCard
                     key={checkpoint.stage || index}
                     checkpoint={checkpoint}
-                    isLast={index === (cart.checkpoints || []).length - 1}
+                    isLast={index === (localCheckpoints || []).length - 1}
+                    onRetry={() => handleRetryStage(checkpoint.stage)}
+                    isRetrying={retryingStage === checkpoint.stage}
                   />
                 ))}
               </div>
@@ -248,7 +316,7 @@ function InfoCard({ label, value }) {
   );
 }
 
-function CheckpointCard({ checkpoint, isLast }) {
+function CheckpointCard({ checkpoint, isLast, onRetry, isRetrying }) {
   const statusKey = STATUS_STYLES[checkpoint.status] ? checkpoint.status : "pending";
   const status = STATUS_STYLES[statusKey];
   const Icon = status.icon;
@@ -276,10 +344,24 @@ function CheckpointCard({ checkpoint, isLast }) {
               </h4>
             </div>
 
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${status.badge}`}>
-              <Icon size={14} />
-              {status.label}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${status.badge}`}>
+                <Icon size={14} />
+                {status.label}
+              </span>
+              {checkpoint.status === "failure" && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  disabled={isRetrying}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50"
+                  title="Retry sending this reminder stage"
+                >
+                  <RefreshCw size={12} className={isRetrying ? "animate-spin" : ""} />
+                  {isRetrying ? "Retrying..." : "Retry"}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-500">

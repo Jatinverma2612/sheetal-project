@@ -34,55 +34,81 @@ const sendViaBrevo = async (options) => {
     ? to.map((email) => ({ email }))
     : [{ email: to }];
 
-  try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: recipients,
-        subject: subject,
-        htmlContent: htmlContent,
-      }),
-    });
+  const maxRetries = 2;
+  let lastError;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const err = new Error(
-        `Brevo API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`,
-      );
-      err.providerRejected = true;
-      err.statusCode = response.status;
-      if (response.status >= 500) {
-        err.isAmbiguous = true;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey,
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: recipients,
+          subject: subject,
+          htmlContent: htmlContent,
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const err = new Error(
+          `Brevo API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`,
+        );
+        err.providerRejected = true;
+        err.statusCode = response.status;
+        if (response.status >= 500) {
+          err.isAmbiguous = true;
+        }
+        // Don't retry 4xx client errors (bad payload, unauthorized, etc.)
+        if (response.status >= 400 && response.status < 500) {
+          throw err;
+        }
+        lastError = err;
+      } else {
+        const data = await response.json();
+        return {
+          success: true,
+          mock: false,
+          provider: "brevo",
+          providerAccepted: true,
+          deliveryConfirmed: false, // Brevo HTTP 201 indicates queued acceptance, never confirmed inbox delivery
+          messageId: data?.messageId || null,
+          raw: data,
+        };
       }
-      throw err;
+    } catch (err) {
+      lastError = err;
+      // Do not retry 4xx errors
+      if (err.statusCode && err.statusCode < 500) {
+        throw err;
+      }
+      if (attempt < maxRetries) {
+        logger.warn(
+          `[Brevo] Send attempt ${attempt + 1} failed (${err.message}). Retrying in 1.5s...`,
+        );
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
-
-    const data = await response.json();
-    return {
-      success: true,
-      mock: false,
-      provider: "brevo",
-      providerAccepted: true,
-      deliveryConfirmed: false, // Brevo HTTP 201 indicates queued acceptance, never confirmed inbox delivery
-      messageId: data?.messageId || null,
-      raw: data,
-    };
-  } catch (err) {
-    if (
-      err.isAmbiguous ||
-      err.code === "ETIMEDOUT" ||
-      err.code === "ECONNRESET" ||
-      err.name === "AbortError"
-    ) {
-      err.isAmbiguous = true;
-    }
-    throw err;
   }
+
+  if (
+    lastError?.isAmbiguous ||
+    lastError?.code === "ETIMEDOUT" ||
+    lastError?.code === "ECONNRESET" ||
+    lastError?.name === "AbortError" ||
+    lastError?.cause?.code === "UND_ERR_CONNECT_TIMEOUT"
+  ) {
+    lastError.isAmbiguous = true;
+  }
+  throw lastError;
 };
 
 /**

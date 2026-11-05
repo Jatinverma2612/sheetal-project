@@ -66,7 +66,7 @@ const summarizeAttemptChannels = (attempt = null, defaultChannels = []) => {
   }));
 };
 
-const buildReminderCheckpoints = (cart, activeSchedule = ABANDONED_CART_STEPS) => {
+export const buildReminderCheckpoints = (cart, activeSchedule = ABANDONED_CART_STEPS) => {
   const allAttempts = Array.isArray(cart.abandonmentReminderAttempts)
     ? cart.abandonmentReminderAttempts
     : [];

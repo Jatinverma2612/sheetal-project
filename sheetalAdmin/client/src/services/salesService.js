@@ -121,3 +121,13 @@ export const updateAbandonedCartSettings = async (settingsData) => {
   });
   return handleResponse(res);
 };
+
+export const retryAbandonedCartStage = async (cartId, stage) => {
+  const res = await fetch(`${API_BASE_URL}/abandoned-cart/retry-stage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ cartId, stage }),
+  });
+  return handleResponse(res);
+};

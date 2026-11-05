@@ -648,10 +648,9 @@ export const sendReminder = async ({
 
     const alreadyProcessed = cart.abandonmentReminderAttempts?.some(
       (attempt) =>
-        attempt.jobId === jobId ||
-        (attempt.cycleId === cycleId &&
-          attempt.stage === stage &&
-          ["success", "quarantined", "skipped"].includes(attempt.status)),
+        ["success", "quarantined", "skipped"].includes(attempt.status) &&
+        (attempt.jobId === jobId ||
+          (attempt.cycleId === cycleId && attempt.stage === stage)),
     );
     if (alreadyProcessed) {
       return { status: "skipped", reason: "duplicate_job" };

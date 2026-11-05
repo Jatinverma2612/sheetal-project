@@ -47,14 +47,27 @@ const loadReminderPolicy = async () => {
 const buildAbandonedCartJobId = (cartId, cycleId, stage) =>
   `abandoned-cart-${cartId}-${cycleId || "no-cycle"}-${stage}`;
 
-const stageAlreadyHandled = (cart, cycleId, stage) =>
-  Array.isArray(cart?.abandonmentReminderAttempts) &&
-  cart.abandonmentReminderAttempts.some(
-    (attempt) =>
-      attempt?.cycleId === cycleId &&
-      attempt?.stage === stage &&
-      ["success", "quarantined", "skipped"].includes(attempt?.status),
+const MAX_STAGE_FAILURES = 3;
+
+const stageAlreadyHandled = (cart, cycleId, stage) => {
+  if (!Array.isArray(cart?.abandonmentReminderAttempts)) {
+    return false;
+  }
+  const stageAttempts = cart.abandonmentReminderAttempts.filter(
+    (attempt) => attempt?.cycleId === cycleId && attempt?.stage === stage,
   );
+  if (
+    stageAttempts.some((attempt) =>
+      ["success", "quarantined", "skipped"].includes(attempt?.status),
+    )
+  ) {
+    return true;
+  }
+  const failureCount = stageAttempts.filter(
+    (attempt) => attempt?.status === "failure",
+  ).length;
+  return failureCount >= MAX_STAGE_FAILURES;
+};
 
 export const processDueAbandonedCarts = async () => {
   if (schedulerRunning) {
