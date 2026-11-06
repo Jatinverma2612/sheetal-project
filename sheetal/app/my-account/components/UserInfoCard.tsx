@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { getApiImageUrl } from "../../services/api";
 
@@ -13,25 +13,57 @@ interface UserInfoCardProps {
   onSelectSection: (section: string) => void;
 }
 
+const getUserInitials = (name?: string, email?: string): string => {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email && email.trim()) {
+    return email.trim().slice(0, 2).toUpperCase();
+  }
+  return "U";
+};
+
 const UserInfoCard: React.FC<UserInfoCardProps> = ({
   user,
   onSelectSection,
 }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [user?.profilePicture]);
+
   if (!user) return null;
 
-  const profileImageSrc = getApiImageUrl(user.profilePicture);
+  const rawPic = user.profilePicture?.trim();
+  const hasCustomPic = Boolean(
+    rawPic &&
+      rawPic !== "/assets/default-image.png" &&
+      rawPic !== "default-image.png"
+  );
+  const profileImageSrc = hasCustomPic ? getApiImageUrl(rawPic, "") : "";
 
   return (
     <div className="col-lg-12">
       <div className="flex items-center space-x-4 mb-4">
-        <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-          <Image
-            src={profileImageSrc || "/assets/default-image.png"}
-            alt="User Pic"
-            width={64}
-            height={64}
-            className="object-cover w-full h-full"
-          />
+        <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1b3d2f] text-[#f5eaac] flex-shrink-0 flex items-center justify-center font-semibold text-lg border border-amber-900/10 shadow-sm select-none">
+          {profileImageSrc && !imgError ? (
+            <Image
+              src={profileImageSrc}
+              alt={user.name ? `${user.name}'s profile` : "User profile"}
+              width={64}
+              height={64}
+              referrerPolicy="no-referrer"
+              className="object-cover w-full h-full"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <span>{getUserInitials(user.name, user.email)}</span>
+          )}
         </div>
         <div>
           <h4 className="text-xl font-semibold uppercase">Account</h4>

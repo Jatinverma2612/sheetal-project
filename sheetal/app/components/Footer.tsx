@@ -9,6 +9,33 @@ import FooterClient, {
   type RawFooterBlock,
 } from "./FooterClient";
 
+const normalizeFooterHref = (href: string): string => {
+  if (!href) return "/";
+  const trimmed = href.trim();
+  const map: Record<string, string> = {
+    "/sitemap": "/sitemap",
+    "/track-order": "/my-account/orders",
+    "/return-order": "/my-account/orders",
+    "/our-story": "/about-us#our-story",
+    "/terms-of-use": "/terms-and-conditions",
+    "/terms-conditions": "/terms-and-conditions",
+    "/return-policy": "/return-exchange-policy",
+    "/return-and-exchange-policy": "/return-exchange-policy",
+    "/returns": "/return-exchange-policy",
+    "/returne-policy": "/return-exchange-policy",
+  };
+  return map[trimmed] || trimmed;
+};
+
+const isDummyTestPage = (page: { title?: string; slug?: string }) => {
+  const text = `${page.title || ""} ${page.slug || ""}`.toLowerCase().trim();
+  return (
+    /^(test|tester|new test page|this is a test page|test one|test-one|testing)$/i.test(
+      text,
+    ) || /^test\s*\d*$/i.test(text)
+  );
+};
+
 const defaultLayout: FooterBlock[] = [
   {
     id: "double-col",
@@ -160,18 +187,32 @@ async function getFooterData(): Promise<{
       nextLayout.forEach((block) => {
         if (block.type === "double") {
           block.columns.forEach((column) => {
-            column.links = column.links.filter(
-              (link) => !String(link.id || "").startsWith("static-page-"),
-            );
+            column.links = column.links
+              .filter(
+                (link) => !String(link.id || "").startsWith("static-page-"),
+              )
+              .map((link) => ({
+                ...link,
+                href: normalizeFooterHref(link.href),
+              }));
           });
         } else {
-          block.links = block.links.filter(
-            (link) => !String(link.id || "").startsWith("static-page-"),
-          );
+          block.links = block.links
+            .filter(
+              (link) => !String(link.id || "").startsWith("static-page-"),
+            )
+            .map((link) => ({
+              ...link,
+              href: normalizeFooterHref(link.href),
+            }));
         }
       });
 
-      if (!footerPages?.length) return nextLayout;
+      const validFooterPages = (footerPages || []).filter(
+        (page) => !isDummyTestPage(page),
+      );
+
+      if (!validFooterPages.length) return nextLayout;
 
       const doubleBlock = nextLayout.find(
         (block): block is Extract<FooterBlock, { type: "double" }> =>
@@ -182,7 +223,7 @@ async function getFooterData(): Promise<{
           block.type === "single",
       );
 
-      footerPages.forEach((page) => {
+      validFooterPages.forEach((page) => {
         if (page.footerPlacement === "footer_column_3") {
           if (!singleBlock) return;
           singleBlock.hidden = false;

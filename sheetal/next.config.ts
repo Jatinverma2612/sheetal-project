@@ -47,6 +47,55 @@ const nextConfig: NextConfig = {
     ],
 
   },
+  async redirects() {
+    return [
+      {
+        source: "/track-order",
+        destination: "/my-account/orders",
+        permanent: false,
+      },
+      {
+        source: "/return-order",
+        destination: "/my-account/orders",
+        permanent: false,
+      },
+      {
+        source: "/our-story",
+        destination: "/about-us#our-story",
+        permanent: false,
+      },
+      {
+        source: "/terms-of-use",
+        destination: "/terms-and-conditions",
+        permanent: false,
+      },
+      {
+        source: "/terms-conditions",
+        destination: "/terms-and-conditions",
+        permanent: false,
+      },
+      {
+        source: "/return-policy",
+        destination: "/return-exchange-policy",
+        permanent: false,
+      },
+      {
+        source: "/return-and-exchange-policy",
+        destination: "/return-exchange-policy",
+        permanent: false,
+      },
+      {
+        source: "/returns",
+        destination: "/return-exchange-policy",
+        permanent: false,
+      },
+      {
+        source: "/returne-policy",
+        destination: "/return-exchange-policy",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

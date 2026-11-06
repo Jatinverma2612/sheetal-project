@@ -5,6 +5,20 @@ import Image from "next/image";
 import { getCurrentUser } from "../../services/userService";
 import { getApiImageUrl } from "../../services/api";
 
+const getUserInitials = (name?: string, email?: string): string => {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email && email.trim()) {
+    return email.trim().slice(0, 2).toUpperCase();
+  }
+  return "U";
+};
+
 const ProfileView: React.FC = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -13,6 +27,7 @@ const ProfileView: React.FC = () => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
+  const [imgError, setImgError] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialError, setInitialError] = useState("");
@@ -34,7 +49,14 @@ const ProfileView: React.FC = () => {
               : "",
           );
           setGender(userDetails.gender || "");
-          setProfilePictureUrl(getApiImageUrl(userDetails.profilePicture));
+          const rawPic = userDetails.profilePicture?.trim();
+          const hasCustomPic = Boolean(
+            rawPic &&
+              rawPic !== "/assets/default-image.png" &&
+              rawPic !== "default-image.png",
+          );
+          setProfilePictureUrl(hasCustomPic ? getApiImageUrl(rawPic, "") : "");
+          setImgError(false);
         } else {
           setInitialError("Failed to fetch user data.");
         }
@@ -77,22 +99,28 @@ const ProfileView: React.FC = () => {
       {/* Content */}
       <div className="text-sm">
         {/* Profile Picture */}
-        {profilePictureUrl && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-6 px-5 border border-gray-200 rounded-sm mt-3">
-            <label className="sm:w-56 text-gray-700 font-semibold">
-              Profile Picture
-            </label>
-            <div className="flex items-center space-x-4">
-              <Image
-                src={profilePictureUrl}
-                alt="Profile"
-                width={80}
-                height={80}
-                className="h-20 w-20 rounded-full object-cover"
-              />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-6 px-5 border border-gray-200 rounded-sm mt-3">
+          <label className="sm:w-56 text-gray-700 font-semibold">
+            Profile Picture
+          </label>
+          <div className="flex items-center space-x-4">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-[#1b3d2f] text-[#f5eaac] flex-shrink-0 flex items-center justify-center font-semibold text-2xl border border-amber-900/10 shadow-sm select-none">
+              {profilePictureUrl && !imgError ? (
+                <Image
+                  src={profilePictureUrl}
+                  alt={name ? `${name}'s profile` : "Profile"}
+                  width={80}
+                  height={80}
+                  referrerPolicy="no-referrer"
+                  className="h-20 w-20 rounded-full object-cover"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <span>{getUserInitials(name, email)}</span>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Mobile Number */}
         <div className="flex items-center justify-between py-6 px-5 border border-gray-200 hover:border-[#ac8037] rounded-sm mt-3">

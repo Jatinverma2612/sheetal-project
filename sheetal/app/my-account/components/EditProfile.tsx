@@ -27,6 +27,20 @@ import toast from "react-hot-toast";
 const RESEND_AVAILABLE_AT_KEY = "otp_resend_available_at";
 const RESEND_DELAY_SECONDS = 20;
 
+const getUserInitials = (name?: string, email?: string): string => {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email && email.trim()) {
+    return email.trim().slice(0, 2).toUpperCase();
+  }
+  return "U";
+};
+
 const EditProfile: React.FC = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,6 +49,7 @@ const EditProfile: React.FC = () => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState<"Male" | "Female">("Male");
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
+  const [imgError, setImgError] = useState(false);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(
     null,
   );
@@ -97,7 +112,14 @@ const EditProfile: React.FC = () => {
               : "",
           );
           setGender(userDetails.gender || "Male");
-          setProfilePictureUrl(getApiImageUrl(userDetails.profilePicture));
+          const rawPic = userDetails.profilePicture?.trim();
+          const hasCustomPic = Boolean(
+            rawPic &&
+              rawPic !== "/assets/default-image.png" &&
+              rawPic !== "default-image.png",
+          );
+          setProfilePictureUrl(hasCustomPic ? getApiImageUrl(rawPic, "") : "");
+          setImgError(false);
         } else {
           setInitialError("Failed to fetch user data.");
         }
@@ -431,6 +453,7 @@ const EditProfile: React.FC = () => {
       setProfilePictureFile(file);
       if (profilePicturePreview) URL.revokeObjectURL(profilePicturePreview);
       setProfilePicturePreview(URL.createObjectURL(file));
+      setImgError(false);
     } else {
       setProfilePictureFile(null);
       if (profilePicturePreview) URL.revokeObjectURL(profilePicturePreview);
@@ -472,7 +495,14 @@ const EditProfile: React.FC = () => {
       if (response.success) {
         setSuccess("Profile updated successfully!");
         if (response.data?.profilePicture) {
-          setProfilePictureUrl(getApiImageUrl(response.data.profilePicture));
+          const rawPic = response.data.profilePicture?.trim();
+          const hasCustomPic = Boolean(
+            rawPic &&
+              rawPic !== "/assets/default-image.png" &&
+              rawPic !== "default-image.png",
+          );
+          setProfilePictureUrl(hasCustomPic ? getApiImageUrl(rawPic, "") : "");
+          setImgError(false);
           setProfilePicturePreview(null);
           setProfilePictureFile(null);
         }
@@ -504,17 +534,23 @@ const EditProfile: React.FC = () => {
         {!initialLoading && !initialError && (
           <>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-6 px-5 border border-gray-200 rounded-sm mt-3">
-              <label className="sm:w-56 text-gray-700">Profile Picture</label>
+              <label className="sm:w-56 text-gray-700 font-medium">Profile Picture</label>
               <div className="flex items-center gap-4 flex-wrap">
-                {(profilePicturePreview || profilePictureUrl) && (
-                  <Image
-                    src={profilePicturePreview || profilePictureUrl}
-                    alt="Profile"
-                    width={80}
-                    height={80}
-                    className="h-20 w-20 rounded-full object-cover"
-                  />
-                )}
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-[#1b3d2f] text-[#f5eaac] flex-shrink-0 flex items-center justify-center font-semibold text-2xl border border-amber-900/10 shadow-sm select-none">
+                  {(profilePicturePreview || profilePictureUrl) && !imgError ? (
+                    <Image
+                      src={profilePicturePreview || profilePictureUrl}
+                      alt={name ? `${name}'s profile` : "Profile"}
+                      width={80}
+                      height={80}
+                      referrerPolicy="no-referrer"
+                      className="h-20 w-20 rounded-full object-cover"
+                      onError={() => setImgError(true)}
+                    />
+                  ) : (
+                    <span>{getUserInitials(name, email)}</span>
+                  )}
+                </div>
                 <input
                   type="file"
                   accept="image/*"

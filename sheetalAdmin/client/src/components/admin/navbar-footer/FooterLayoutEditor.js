@@ -63,13 +63,13 @@ const defaultFooterLayout = [
           {
             id: createId(),
             label: "Track Order",
-            href: "/track-order",
+            href: "/my-account/orders",
             hidden: false,
           },
           {
             id: createId(),
             label: "Return Order",
-            href: "/return-order",
+            href: "/my-account/orders",
             hidden: false,
           },
           { id: createId(), label: "Sitemap", href: "/sitemap", hidden: false },
