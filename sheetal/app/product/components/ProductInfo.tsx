@@ -253,9 +253,23 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
       <div className="mb-5">
         <div className="flex justify-between items-center mb-2">
           <label className="block text-[17px] font-medium text-black">
-            Select Size:
+            {Array.isArray(product.allSizes) &&
+            product.allSizes.length > 0 &&
+            product.allSizes.every((s) => {
+              const canonical = canonicalizeSizeName(s.name);
+              return canonical === "Free Size" || canonical === "One Size";
+            })
+              ? "Size:"
+              : "Select Size:"}
           </label>
-          {hasSizeChart && (
+          {hasSizeChart && !(
+            Array.isArray(product.allSizes) &&
+            product.allSizes.length > 0 &&
+            product.allSizes.every((s) => {
+              const canonical = canonicalizeSizeName(s.name);
+              return canonical === "Free Size" || canonical === "One Size";
+            })
+          ) && (
             <button
               onClick={onSizeChartOpen}
               className="flex items-center text-sm text-red-500 font-semibold hover:underline cursor-pointer"

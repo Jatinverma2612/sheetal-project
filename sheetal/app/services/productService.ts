@@ -90,6 +90,7 @@ export interface Product {
     name: string;
     slug: string;
     sizeChart?: SizeChartData | null;
+    sizeMode?: string;
   };
   sizeChart?: SizeChartData | null;
 

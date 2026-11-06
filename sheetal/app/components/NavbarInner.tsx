@@ -1212,6 +1212,7 @@ const NavbarInner = ({
               <button
                 onClick={toggleSearch}
                 className="hover:opacity-80 transition-opacity cursor-pointer"
+                aria-label="Search"
               >
                 <Image
                   src="/assets/icons/search.svg"
@@ -1234,6 +1235,7 @@ const NavbarInner = ({
               <Link
                 href={wishlistHref}
                 className="relative hover:opacity-80 transition-opacity"
+                aria-label="Wishlist"
               >
                 <Image
                   src="/assets/icons/heart.svg"
@@ -1253,6 +1255,7 @@ const NavbarInner = ({
                 <Link
                   href="/cart"
                   className="relative hover:opacity-80 transition-opacity"
+                  aria-label="Shopping Cart"
                 >
                   <Image
                     src="/assets/icons/shopping-bag.png"

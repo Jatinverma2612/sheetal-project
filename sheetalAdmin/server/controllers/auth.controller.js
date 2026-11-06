@@ -71,7 +71,7 @@ export const forgotPassword = async (req, res, next) => {
     return successResponse(
       res,
       200,
-      { resetToken: result.resetToken },
+      null,
       result.message,
     );
   } catch (error) {

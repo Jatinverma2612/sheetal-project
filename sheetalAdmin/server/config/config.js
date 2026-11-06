@@ -36,7 +36,7 @@ export const config = Object.freeze({
       30,
       Math.max(
         1,
-        parseInt(process.env.ABANDONED_CART_INACTIVITY_MINUTES || "20", 10) ||
+        parseInt(process.env.ABANDONED_CART_INACTIVITY_MINUTES || "1", 10) ||
           1,
       ),
     ),

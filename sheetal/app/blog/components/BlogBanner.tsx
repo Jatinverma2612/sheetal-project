@@ -32,7 +32,7 @@ const BlogBanner: React.FC<BlogBannerProps> = ({ title, image }) => {
               <li className=" text-[#6a3f07]">/</li>
               <li>
                 <Link
-                  href="/blogs"
+                  href="/blog"
                   className="text-[#6a3f07] transition-colors"
                 >
                   Blogs

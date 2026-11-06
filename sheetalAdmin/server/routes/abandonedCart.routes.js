@@ -193,7 +193,7 @@ router.put("/settings", isAuthenticated, isAdmin, async (req, res, next) => {
     if (inactivityMinutes !== undefined) {
       updates.abandonedCartInactivityMinutes = Math.min(
         1440,
-        Math.max(1, Number(inactivityMinutes) || 20),
+        Math.max(1, Number(inactivityMinutes) || 1),
       );
     }
     if (discountPercent !== undefined) {

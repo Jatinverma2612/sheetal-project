@@ -104,6 +104,9 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
       >
         <div
           onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="enquire-modal-title"
           style={{
             '--modal-size': 'min(94vw, 92vh, 865px)',
           } as React.CSSProperties}
@@ -137,7 +140,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
 
           {/* Form Column: Horizontally Centered on the Entire Circle's Geometric Center Axis */}
         <div className="w-full max-w-[425px] md:w-[54%] mx-auto flex flex-col items-center relative z-20">
-          <h3 className="text-2xl sm:text-[26px] md:text-3xl lg:text-[32px] font-normal text-[#683e14] font-[family-name:var(--font-optima)] text-center tracking-wide leading-tight">
+          <h3 id="enquire-modal-title" className="text-2xl sm:text-[26px] md:text-3xl lg:text-[32px] font-normal text-[#683e14] font-[family-name:var(--font-optima)] text-center tracking-wide leading-tight">
             Enquire Form
           </h3>
 
@@ -160,6 +163,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                 type="text"
                 value={productTitle}
                 disabled
+                aria-label="Product Title"
                 className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-center text-sm sm:text-base text-gray-800 font-medium truncate"
               />
 
@@ -169,6 +173,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                   value={selectedSize}
                   onChange={(e) => setSelectedSize(e.target.value)}
                   required
+                  aria-label="Select Size"
                   className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-sm sm:text-base text-gray-800 focus:outline-none focus:border-[#683e14] cursor-pointer"
                 >
                   <option value="">Select Size</option>
@@ -183,6 +188,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                 type="text"
                 placeholder="Name"
                 required
+                aria-label="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-sm sm:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
@@ -193,6 +199,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                 type="email"
                 placeholder="Email"
                 required
+                aria-label="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-sm sm:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
@@ -204,6 +211,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                 placeholder="Phone Number"
                 maxLength={10}
                 required
+                aria-label="Phone Number"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full rounded-full border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-sm sm:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14]"
@@ -214,6 +222,7 @@ const EnquireModal: React.FC<EnquireModalProps> = ({
                 placeholder="Message"
                 rows={2}
                 value={message}
+                aria-label="Message"
                 onChange={(e) => setMessage(e.target.value)}
                 className="w-full rounded-[20px] sm:rounded-[24px] md:rounded-[28px] border border-gray-400/90 bg-transparent px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 md:py-3 lg:py-3.5 text-sm sm:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#683e14] h-18 sm:h-20 md:h-[86px] resize-none"
               />

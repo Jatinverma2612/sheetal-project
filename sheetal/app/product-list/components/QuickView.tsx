@@ -26,6 +26,7 @@ import { useCart } from "../../hooks/useCart";
 import { redirectToLogin } from "../../utils/authRedirect";
 import { ORDER_CONFIRMED_EVENT } from "../../hooks/shopEvents";
 import { buildProductHref } from "../../utils/productRoutes";
+import { canonicalizeSizeName } from "../../utils/sizeUtils";
 
 const getStockLimitMessage = (count: number) =>
   `This item only has ${count} left.`;
@@ -675,7 +676,13 @@ const QuickView: React.FC<QuickViewProps> = ({ productSlug, onClose }) => {
                 {hasSizes && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-800 mb-2">
-                      Select Size:
+                      {allSizesForDisplay.length > 0 &&
+                      allSizesForDisplay.every((name) => {
+                        const canonical = canonicalizeSizeName(name);
+                        return canonical === "Free Size" || canonical === "One Size";
+                      })
+                        ? "Size:"
+                        : "Select Size:"}
                     </label>
                     <div className="flex flex-wrap gap-3">
                       {allSizesForDisplay.map((sizeName) => {

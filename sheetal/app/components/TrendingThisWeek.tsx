@@ -66,6 +66,7 @@ function ProductCard({
               e.stopPropagation();
               onToggleWishlist(product.productId);
             }}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Image
               src={

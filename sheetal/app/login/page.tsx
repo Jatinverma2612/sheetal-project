@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Footer from "../components/Footer";
 import LoginForm from "./components/LoginForm";
 import { getSettings, getLoginImageUrl, getLogoUrl } from "../services/settingsService";
+
+export const metadata: Metadata = {
+  title: "Login | Studio By Sheetal",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export const dynamic = "force-dynamic";
 

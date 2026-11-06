@@ -24,6 +24,24 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
   isMovingToCart = false,
 }) => {
   const productHref = buildProductHref(product);
+  const fallbackImage = "/assets/placeholder-product.jpg";
+  const [imgSrc, setImgSrc] = React.useState(
+    product.mainImage?.url || fallbackImage,
+  );
+  const [hoverImgSrc, setHoverImgSrc] = React.useState(
+    product.hoverImage?.url || product.mainImage?.url || fallbackImage,
+  );
+
+  React.useEffect(() => {
+    setImgSrc(product.mainImage?.url || fallbackImage);
+  }, [product.mainImage?.url]);
+
+  React.useEffect(() => {
+    setHoverImgSrc(
+      product.hoverImage?.url || product.mainImage?.url || fallbackImage,
+    );
+  }, [product.hoverImage?.url, product.mainImage?.url]);
+
   const effectiveStock =
     typeof product.totalStock === "number"
       ? product.totalStock
@@ -53,24 +71,22 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           className="block aspect-[3/4] relative"
         >
           <Image
-            src={product.mainImage?.url || "/assets/placeholder-product.jpg"}
-            alt={product.name}
+            src={imgSrc}
+            alt={product.name || "Product"}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             className="object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={() => setImgSrc(fallbackImage)}
           />
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 overflow-hidden rounded-lg">
-            {product.hoverImage?.url && (
-              <Image
-                src={
-                  product.hoverImage.url || "/assets/placeholder-product.jpg"
-                }
-                alt={product.name}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                className="object-cover"
-              />
-            )}
+            <Image
+              src={hoverImgSrc}
+              alt={product.name || "Product"}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+              className="object-cover"
+              onError={() => setHoverImgSrc(fallbackImage)}
+            />
           </div>
         </Link>
       </div>

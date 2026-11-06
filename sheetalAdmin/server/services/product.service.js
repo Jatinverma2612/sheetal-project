@@ -892,13 +892,33 @@ export const createProductService = async (data, files, userId) => {
     : data.existingOgImage || "";
 
   let galleryImages = [];
+  if (data.existingImages) {
+    try {
+      const parsed =
+        typeof data.existingImages === "string"
+          ? JSON.parse(data.existingImages)
+          : data.existingImages;
+      if (Array.isArray(parsed)) {
+        galleryImages = parsed.map((img, index) => ({
+          url: img.url || (typeof img === "string" ? img : ""),
+          public_id: img.public_id || "",
+          alt: img.alt || `${parsedData.name} gallery ${index + 1}`,
+          isDefault: Boolean(img.isDefault),
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   if (files?.images) {
-    galleryImages = files.images.map((file, index) => ({
+    const uploadedImages = files.images.map((file, index) => ({
       url: file.location || file.url || file.path,
       public_id: file.public_id || file.key || file.filename,
-      alt: `${parsedData.name} gallery ${index + 1}`,
+      alt: `${parsedData.name} gallery ${galleryImages.length + index + 1}`,
       isDefault: false,
     }));
+    galleryImages = [...galleryImages, ...uploadedImages];
   }
 
   let totalStock = 0;
@@ -1238,13 +1258,24 @@ export const updateProductService = async (id, data, files) => {
   let newGalleryImages = [];
   if (files && files["images"]) {
     newGalleryImages = files["images"].map((file, index) => ({
-      url: file.location || file.path,
-      public_id: file.key || file.filename,
+      url: file.location || file.url || file.path,
+      public_id: file.public_id || file.key || file.filename,
       alt: `${parsedData.name} gallery ${existingImages.length + index + 1}`,
       isDefault: false,
     }));
   }
   parsedData.images = [...existingImages, ...newGalleryImages];
+
+  if (Array.isArray(product.images)) {
+    const remainingUrls = new Set(
+      existingImages.map((img) => (typeof img === "string" ? img : img?.url)).filter(Boolean),
+    );
+    for (const oldImg of product.images) {
+      if (oldImg?.url && !remainingUrls.has(oldImg.url)) {
+        await deleteStorageAsset(oldImg.public_id, oldImg.url).catch(() => {});
+      }
+    }
+  }
 
   const updatedProduct = await Product.findByIdAndUpdate(
     id,

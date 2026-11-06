@@ -768,6 +768,14 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
     },
   );
 
+  const isFreeSizeOnly =
+    (allSizesForDisplay.length > 0 &&
+      allSizesForDisplay.every((s) => {
+        const canonical = canonicalizeSizeName(s.name);
+        return canonical === "Free Size" || canonical === "One Size";
+      })) ||
+    product?.category?.sizeMode === "free";
+
   const handleColorChange = (color: ColorOption) => {
     setSelectedColor(color.name);
     const newlySelectedVariant =
@@ -1016,7 +1024,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
               isOutOfStock={isProductOutOfStock}
               selectedVariantData={selectedVariantData}
               selectedVariantSizes={currentSelectedVariant?.sizes || []}
-              hasSizeChart={Boolean(sizeChartData)}
+              hasSizeChart={Boolean(sizeChartData) && !isFreeSizeOnly}
               settings={settings}
             />
           </div>
@@ -1055,13 +1063,13 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
       />
 
       <SizeChartModal
-        isOpen={sizeChartOpen}
+        isOpen={sizeChartOpen && !isFreeSizeOnly}
         onClose={() => setSizeChartOpen(false)}
         selectedColor={selectedColor}
         colorToAvailableSizesMap={productInfoData.colorToAvailableSizesMap}
         selectedSize={selectedSize}
         setSelectedSize={setSelectedSize}
-        sizeChartData={sizeChartData}
+        sizeChartData={isFreeSizeOnly ? null : sizeChartData}
         onAddToCart={handleAddToCart}
         onAddToWishlist={() => toggleProductInWishlist(product._id)}
         isWishlisted={isProductInWishlist(product._id)}

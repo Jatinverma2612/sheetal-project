@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import StarRating from "./StarRating";
@@ -20,6 +20,20 @@ const ProductCard = ({
   const wishlistProductId = product.productId || product._id;
   const productHref = buildProductHref(product);
 
+  const fallbackImage = "/assets/placeholder-product.jpg";
+  const [imgSrc, setImgSrc] = useState(product.image || fallbackImage);
+  const [hoverImgSrc, setHoverImgSrc] = useState(
+    product.hoverImage || product.image || fallbackImage,
+  );
+
+  useEffect(() => {
+    setImgSrc(product.image || fallbackImage);
+  }, [product.image]);
+
+  useEffect(() => {
+    setHoverImgSrc(product.hoverImage || product.image || fallbackImage);
+  }, [product.hoverImage, product.image]);
+
   return (
     <div className="p-2 group h-full flex flex-col">
       {/* Image */}
@@ -36,6 +50,7 @@ const ProductCard = ({
           <button
             type="button"
             className="p-2 rounded-full shadow-md cursor-pointer hover:text-white transition-colors"
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             onClick={() => {
               if (wishlistProductId && onToggleWishlist) {
                 onToggleWishlist(wishlistProductId);
@@ -59,16 +74,18 @@ const ProductCard = ({
         <Link href={productHref}>
           <div className="relative aspect-[3/4]">
             <Image
-              src={product.image || "/assets/placeholder-product.jpg"}
-              alt={product.name}
+              src={imgSrc}
+              alt={product.name || "Product"}
               fill
               className="object-cover transition-opacity duration-500 group-hover:opacity-0 rounded-lg"
+              onError={() => setImgSrc(fallbackImage)}
             />
             <Image
-              src={product.hoverImage || "/assets/placeholder-product.jpg"}
-              alt={product.name}
+              src={hoverImgSrc}
+              alt={product.name || "Product"}
               fill
               className="object-cover absolute top-0 left-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 rounded-lg"
+              onError={() => setHoverImgSrc(fallbackImage)}
             />
           </div>
         </Link>

@@ -56,20 +56,20 @@ export default function ViewProductDrawer({ isOpen, onClose, product }) {
           <div className="grid grid-cols-4 gap-2">
             <div className="col-span-4 aspect-[16/9] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
               <img
-                src={product.images?.[0]?.url}
+                src={product.mainImage?.url || product.images?.[0]?.url || "/placeholder.png"}
                 className="w-full h-full object-cover"
                 alt="Main"
               />
             </div>
-            {product.images?.slice(1).map((img, idx) => (
+            {product.images?.map((img, idx) => (
               <div
                 key={idx}
                 className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm"
               >
                 <img
-                  src={img.url}
+                  src={img.url || img}
                   className="w-full h-full object-cover"
-                  alt={`Gallery ${idx}`}
+                  alt={`Gallery ${idx + 1}`}
                 />
               </div>
             ))}

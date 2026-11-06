@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../services/api";
 import { getLogoUrl } from "../services/settingsService";
+import { getSeoSettings, type SeoSocialLink } from "../services/seoSettingsService";
 import FooterClient, {
   type FooterBlock,
   type RawFooterBlock,
@@ -30,9 +31,9 @@ const defaultLayout: FooterBlock[] = [
         hidden: false,
         links: [
           { id: "5", label: "My Account", href: "/my-account" },
-          { id: "6", label: "Track Order", href: "/track-order" },
-          { id: "7", label: "Return Order", href: "/return-order" },
-          { id: "8", label: "Sitemap", href: "/sitemap" },
+          { id: "6", label: "Track Order", href: "/my-account/orders" },
+          { id: "7", label: "Return Order", href: "/my-account/orders" },
+          { id: "8", label: "Sitemap", href: "/shop" },
         ],
       },
     ],
@@ -115,6 +116,7 @@ async function getFooterData(): Promise<{
   layout: FooterBlock[];
   whatsapp?: string;
   logoUrl?: string;
+  socialMediaLinks?: SeoSocialLink[];
 }> {
   try {
     let settings: Record<string, any> = {};
@@ -124,6 +126,7 @@ async function getFooterData(): Promise<{
       slug: string;
       footerPlacement: string;
     }[] = [];
+    let socialMediaLinks: SeoSocialLink[] = [];
 
     try {
       const settingsResponse = await fetch(`${API_BASE_URL}/settings`);
@@ -139,6 +142,13 @@ async function getFooterData(): Promise<{
       footerPages = Array.isArray(pagesJson?.pages) ? pagesJson.pages : [];
     } catch {
       footerPages = [];
+    }
+
+    try {
+      const seo = await getSeoSettings();
+      socialMediaLinks = Array.isArray(seo?.socialMediaLinks) ? seo.socialMediaLinks : [];
+    } catch {
+      socialMediaLinks = [];
     }
 
     const raw = (settings.footerLayout || []) as RawFooterBlock[];
@@ -207,27 +217,27 @@ async function getFooterData(): Promise<{
     };
 
     if (!Array.isArray(raw) || raw.length === 0) {
-      return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl };
+      return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl, socialMediaLinks };
     }
 
     const hasNavbarStructure =
       raw[0].hasOwnProperty("isDroppable") ||
       raw[0].hasOwnProperty("children");
     if (hasNavbarStructure) {
-      return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl };
+      return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl, socialMediaLinks };
     }
 
     if (isNewFormat(raw)) {
-      return { layout: appendStaticPages(raw), whatsapp, logoUrl };
+      return { layout: appendStaticPages(raw), whatsapp, logoUrl, socialMediaLinks };
     }
 
     if (isOldFlatFormat(raw)) {
-      return { layout: appendStaticPages(convertOldToNew(raw)), whatsapp, logoUrl };
+      return { layout: appendStaticPages(convertOldToNew(raw)), whatsapp, logoUrl, socialMediaLinks };
     }
 
-    return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl };
+    return { layout: appendStaticPages(defaultLayout), whatsapp, logoUrl, socialMediaLinks };
   } catch {
-    return { layout: defaultLayout };
+    return { layout: defaultLayout, socialMediaLinks: [] };
   }
 }
 
@@ -235,6 +245,7 @@ const Footer = () => {
   const [layout, setLayout] = useState<FooterBlock[]>(defaultLayout);
   const [whatsapp, setWhatsapp] = useState<string | undefined>();
   const [logoUrl, setLogoUrl] = useState<string | undefined>();
+  const [socialMediaLinks, setSocialMediaLinks] = useState<SeoSocialLink[]>([]);
 
   useEffect(() => {
     let isActive = true;
@@ -245,6 +256,7 @@ const Footer = () => {
       if (data.layout) setLayout(data.layout);
       if (data.whatsapp) setWhatsapp(data.whatsapp);
       if (data.logoUrl) setLogoUrl(data.logoUrl);
+      if (data.socialMediaLinks) setSocialMediaLinks(data.socialMediaLinks);
     };
 
     void loadFooter();
@@ -259,6 +271,7 @@ const Footer = () => {
       layout={layout}
       whatsapp={whatsapp}
       logoUrl={logoUrl}
+      socialMediaLinks={socialMediaLinks}
     />
   );
 };

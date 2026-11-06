@@ -35,6 +35,19 @@ const ProductCard: React.FC<{
   onQuickView: (productSlug: string) => void;
 }> = ({ product, viewMode, onToggleWishlist, onQuickView }) => {
   const productHref = buildProductHref(product);
+  const fallbackImage = "/assets/placeholder-product.jpg";
+  const [imgSrc, setImgSrc] = React.useState(product.image || fallbackImage);
+  const [hoverImgSrc, setHoverImgSrc] = React.useState(
+    product.hoverImage || product.image || fallbackImage,
+  );
+
+  React.useEffect(() => {
+    setImgSrc(product.image || fallbackImage);
+  }, [product.image]);
+
+  React.useEffect(() => {
+    setHoverImgSrc(product.hoverImage || product.image || fallbackImage);
+  }, [product.hoverImage, product.image]);
   
   return (
     <div
@@ -60,19 +73,21 @@ const ProductCard: React.FC<{
           className="block w-full h-full relative overflow-hidden rounded-lg"
         >
           <Image
-            src={product.image}
-            alt={product.name}
+            src={imgSrc}
+            alt={product.name || "Product"}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={() => setImgSrc(fallbackImage)}
           />
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 overflow-hidden rounded-lg">
             <Image
-              src={product.hoverImage}
-              alt={product.name}
+              src={hoverImgSrc}
+              alt={product.name || "Product"}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover"
+              onError={() => setHoverImgSrc(fallbackImage)}
             />
           </div>
         </Link>
@@ -81,6 +96,7 @@ const ProductCard: React.FC<{
           <button
             className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center group/icon cursor-pointer"
             onClick={() => onToggleWishlist(product._id)}
+            aria-label={product.isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Image
               src={

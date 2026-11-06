@@ -36,6 +36,15 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
   const [shouldRender, setShouldRender] = useState(isOpen);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
       return;
@@ -84,19 +93,23 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
         onClick={onClose}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="size-chart-title"
         className={`absolute right-0 top-0 h-full w-full max-w-4xl bg-white ${
           isOpen ? "animate-slide-in-right" : "animate-slide-out-right"
         }`}
       >
         <button
           onClick={onClose}
+          aria-label="Close size chart"
           className="absolute top-4 right-4 hover:text-gray-800 text-2xl z-10 border px-2 cursor-pointer"
         >
           ×
         </button>
 
         <div className="p-8">
-          <h3 className="text-4xl text-[#bd9951] font-medium mb-2 font-[family-name:var(--font-optima)] text-center">
+          <h3 id="size-chart-title" className="text-4xl text-[#bd9951] font-medium mb-2 font-[family-name:var(--font-optima)] text-center">
             Size Chart
           </h3>
           <p className="text-center mb-6 text-lg">
@@ -197,6 +210,7 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
                                 value={sizeLabel}
                                 checked={selectedSize === sizeLabel}
                                 onChange={() => setSelectedSize(sizeLabel)}
+                                aria-label={`Select size ${sizeLabel}`}
                                 className="form-radio h-4 w-4 text-orange-600 cursor-pointer"
                                 disabled={!isAvailable}
                               />

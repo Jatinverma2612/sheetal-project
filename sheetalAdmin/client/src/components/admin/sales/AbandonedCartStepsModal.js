@@ -143,7 +143,7 @@ export default function AbandonedCartStepsModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [inactivityMinutes, setInactivityMinutes] = useState(20);
+  const [inactivityMinutes, setInactivityMinutes] = useState(1);
   const [discountPercent, setDiscountPercent] = useState(10);
   const [couponCode, setCouponCode] = useState("SAVE10");
   const [steps, setSteps] = useState(DEFAULT_STEPS);
@@ -155,7 +155,7 @@ export default function AbandonedCartStepsModal({
       getAbandonedCartSettings()
         .then((res) => {
           if (res?.success && res.data) {
-            setInactivityMinutes(res.data.inactivityMinutes ?? 20);
+            setInactivityMinutes(res.data.inactivityMinutes ?? 1);
             setDiscountPercent(res.data.discountPercent ?? 10);
             setCouponCode(res.data.couponCode || "SAVE10");
             if (Array.isArray(res.data.schedule) && res.data.schedule.length > 0) {
@@ -242,7 +242,7 @@ export default function AbandonedCartStepsModal({
   };
 
   const handleResetDefaults = () => {
-    setInactivityMinutes(20);
+    setInactivityMinutes(1);
     setDiscountPercent(10);
     setCouponCode("SAVE10");
     setSteps(DEFAULT_STEPS);

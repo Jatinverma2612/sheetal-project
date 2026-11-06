@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, AlertTriangle } from "lucide-react";
 
 export default function DeleteConfirmModal({
@@ -10,6 +10,17 @@ export default function DeleteConfirmModal({
   itemName,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !isDeleting) {
+        onClose?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, isDeleting]);
 
   if (!isOpen) return null;
 
@@ -33,12 +44,18 @@ export default function DeleteConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-confirm-title"
+        className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative"
+      >
         {/* Close */}
         <button
           type="button"
           onClick={onClose}
           disabled={isDeleting}
+          aria-label="Close delete confirmation"
           className="absolute cursor-pointer top-4 right-4 text-slate-400 hover:text-slate-700 disabled:opacity-50 disabled:cursor-pointer"
         >
           <X size={18} />
@@ -51,7 +68,7 @@ export default function DeleteConfirmModal({
           </div>
         </div>
 
-        <h2 className="text-lg font-bold text-center text-slate-900">
+        <h2 id="delete-confirm-title" className="text-lg font-bold text-center text-slate-900">
           Delete {displayEntityName}?
         </h2>
         <p className="text-sm text-slate-500 text-center mt-2">

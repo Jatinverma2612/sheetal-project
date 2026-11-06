@@ -57,13 +57,13 @@ const HiddenBeauty = ({ content }: { content?: HiddenBeautyContent }) => {
   // Show error or empty state
   if (error || !categories || categories.length === 0) {
     return (
-      <div className="container mx-auto py-12 px-4 text-center font-[family-name:var(--font-optima)]">
+      <div className="container mx-auto py-12 px-4 text-center font-optima">
         <div className="flex gap-8 items-center justify-center">
           <div className="hidden md:block h-[1px] bg-[#a2690f] w-15" />
           <h2 className="font-light text-[#6a3f07]">{heading}</h2>
           <div className="hidden md:block h-[1px] bg-[#a2690f] w-15" />
         </div>
-        <p className=" mx-auto text-[12px] lg:text-[15px] mb-8 text-[#a2690f]">
+        <p className="mx-auto text-sm sm:text-base mb-8 text-[#a2690f]">
           {subheading}
         </p>
         <div className="flex flex-col justify-center items-center h-[400px] text-center">
@@ -95,13 +95,13 @@ const HiddenBeauty = ({ content }: { content?: HiddenBeautyContent }) => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-10 sm:px-6 md:pb-12 lg:px-12 text-center font-[family-name:var(--font-optima)]">
+    <div className="container mx-auto px-4 pb-10 sm:px-6 md:pb-12 lg:px-12 text-center font-optima">
       <div className="flex gap-8 items-center justify-center">
         <div className="hidden md:block h-[2px] bg-[#a2690f] w-15" />
         <h2 className="font-optima font-light text-[#6a3f07]">{heading}</h2>
         <div className="hidden md:block h-[2px] bg-[#a2690f] w-15" />
       </div>
-      <p className="mx-auto mb-10 max-w-3xl text-[12px] text-black font-[family-name:var(--font-montserrat)] lg:mb-16 lg:text-[15px]">
+      <p className="mx-auto mb-10 max-w-3xl text-sm sm:text-base lg:text-lg text-gray-700 font-optima lg:mb-16">
         {subheading}
       </p>
 
@@ -119,7 +119,7 @@ const HiddenBeauty = ({ content }: { content?: HiddenBeautyContent }) => {
     lg:w-[20%]
   "
               >
-                <div className="relative rounded-[16px] overflow-hidden group">
+                <div className="relative rounded-2xl overflow-hidden group">
                   <Link href={`/${cat.slug}`} className="block">
                     <Image
                       src={getCategoryImageUrl(
@@ -138,12 +138,12 @@ const HiddenBeauty = ({ content }: { content?: HiddenBeautyContent }) => {
                     href={`/${cat.slug}`}
                     className="
         absolute bottom-0 left-0 w-full
-        text-center text-white text-[18px]
+        text-center text-white
         bg-gradient-to-t from-[#251d05] to-transparent
-        pt-[80px] pb-[20px]
+        pt-16 pb-6
         transition-all duration-300"
                   >
-                    <span className="inline-block group-hover:text-[#ffc107] group-hover:-translate-y-3 transition-transform font-[family-name:var(--font-montserrat)] duration-300 text-[25px]">
+                    <span className="inline-block group-hover:text-[#ffc107] group-hover:-translate-y-3 transition-transform font-optima text-xl sm:text-2xl tracking-wide duration-300">
                       {cat.name}
                     </span>
                   </Link>

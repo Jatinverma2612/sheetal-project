@@ -87,6 +87,12 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
   const [canScrollDown, setCanScrollDown] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
   const [transformOrigin, setTransformOrigin] = useState("50% 50%");
+  const fallbackImage = "/assets/placeholder-product.jpg";
+  const [activeImage, setActiveImage] = useState(selectedImage || fallbackImage);
+
+  useEffect(() => {
+    setActiveImage(selectedImage || fallbackImage);
+  }, [selectedImage]);
 
   // Full media list — video slide appended if a video exists
   const media = useMemo(
@@ -337,12 +343,13 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
                 }}
               >
                 <Image
-                  src={selectedImage || "/assets/placeholder-product.jpg"}
-                  alt={title}
+                  src={activeImage}
+                  alt={title || "Product"}
                   fill
                   className="object-cover"
                   priority
                   draggable={false}
+                  onError={() => setActiveImage(fallbackImage)}
                 />
               </div>
             )}

@@ -55,7 +55,7 @@ const settingsSchema = new mongoose.Schema(
     freeShippingThreshold: { type: Number, default: 0 },
     taxPercentage: { type: Number, default: 0 },
     globalHsnCode: { type: String, trim: true, default: "" },
-    abandonedCartInactivityMinutes: { type: Number, default: 20 },
+    abandonedCartInactivityMinutes: { type: Number, default: 1 },
     abandonedCartDiscountPercent: { type: Number, default: 10 },
     abandonedCartCouponCode: { type: String, default: "SAVE10" },
     abandonedCartSchedule: { type: [mongoose.Schema.Types.Mixed], default: undefined },

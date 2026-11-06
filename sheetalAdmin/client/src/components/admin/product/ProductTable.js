@@ -72,6 +72,7 @@ function RowActionsDropdown({ product, onMoveTo }) {
     <div className="relative inline-block text-left" ref={containerRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
+        aria-label="More actions"
         className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer"
         title="More Actions"
       >
@@ -133,6 +134,7 @@ function SortableProductRow({
         <button
           {...listeners}
           {...attributes}
+          aria-label="Reorder product"
           className="cursor-grab p-2 hover:bg-slate-200 rounded-lg"
         >
           <GripVertical size={16} />
@@ -142,6 +144,7 @@ function SortableProductRow({
         <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => toggleSelectOne(product._id)}
+            aria-label={isSelected ? "Deselect product" : "Select product"}
             className="flex cursor-pointer items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
           >
             {isSelected ? (
@@ -270,6 +273,7 @@ function SortableProductRow({
       <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-end gap-4 text-slate-400">
           <button
+            aria-label={product.isStarred ? "Unstar product" : "Star product"}
             title={product.isStarred ? "Unstar" : "Star"}
             disabled={starringId === product._id}
             onClick={(e) => handleStar(e, product._id)}
@@ -286,6 +290,7 @@ function SortableProductRow({
           </button>
 
           <button
+            aria-label="Edit product"
             title="Edit"
             className="hover:text-blue-600 cursor-pointer transition-colors"
             onClick={() => {
@@ -296,6 +301,7 @@ function SortableProductRow({
             <Edit3 size={18} />
           </button>
           <button
+            aria-label="Delete product"
             title="Delete"
             className="hover:text-rose-600 cursor-pointer transition-colors"
             onClick={() => {

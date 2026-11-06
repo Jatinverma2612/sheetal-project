@@ -71,6 +71,8 @@ export default function ProductModal({
     mainImageFile: null,
     hoverImageFile: null,
     videoFile: null,
+    images: [],
+    galleryImageFiles: [],
     isTrending: false,
     isNewArrival: false,
     isCollection: false,
@@ -208,6 +210,12 @@ export default function ProductModal({
             ? initialData.similarProducts
             : [],
           returnPolicy: initialData.returnPolicy || "7 Days Easy Return",
+          images: Array.isArray(initialData.images)
+            ? initialData.images.map((img) =>
+                typeof img === "string" ? { url: img, alt: "" } : img,
+              )
+            : [],
+          galleryImageFiles: [],
           price: undefined,
           discountPrice: undefined,
         });
@@ -489,6 +497,8 @@ export default function ProductModal({
         "mainImageFile",
         "hoverImageFile",
         "videoFile",
+        "images",
+        "galleryImageFiles",
         "variants",
         "sizeChart",
         "category",
@@ -657,6 +667,35 @@ export default function ProductModal({
         data.append("existingOgImage", formData.ogImage);
       }
 
+      // ── Product Gallery Images (Side Photos) ──
+      const existingGallery = (formData.images || [])
+        .filter(
+          (img) =>
+            img &&
+            !(img instanceof File) &&
+            (typeof img === "object" ? Boolean(img.url) : typeof img === "string"),
+        )
+        .map((img) =>
+          typeof img === "string"
+            ? { url: img, alt: `${formData.name || "Product"} gallery` }
+            : {
+                url: img.url,
+                public_id: img.public_id || "",
+                alt: img.alt || `${formData.name || "Product"} gallery`,
+                isDefault: Boolean(img.isDefault),
+              },
+        );
+      data.append("existingImages", JSON.stringify(existingGallery));
+
+      const newGalleryFiles = [
+        ...(formData.images || []).filter((item) => item instanceof File),
+        ...(formData.galleryImageFiles || []).filter((item) => item instanceof File),
+      ];
+      const uniqueNewFiles = Array.from(new Set(newGalleryFiles));
+      uniqueNewFiles.forEach((file) => {
+        data.append("images", file);
+      });
+
       const result = initialData
         ? await updateProduct(initialData._id, data)
         : await createProduct(data);
@@ -691,7 +730,12 @@ export default function ProductModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center z-[100] p-4 text-left">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 flex flex-col h-[92vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-modal-title"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 flex flex-col h-[92vh]"
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -701,7 +745,7 @@ export default function ProductModal({
               <Package size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">
+              <h2 id="product-modal-title" className="text-lg font-bold text-slate-900 leading-tight">
                 {initialData ? "Edit Product Details" : "Add New Inventory"}
               </h2>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
@@ -713,6 +757,7 @@ export default function ProductModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close product modal"
             className="text-slate-400 cursor-pointer hover:text-slate-900 hover:bg-slate-100 p-1.5 rounded-lg transition"
           >
             <X size={20} />

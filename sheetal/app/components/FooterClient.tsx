@@ -10,6 +10,7 @@ import { ArrowUp } from "lucide-react";
 import { createSubscriber } from "../services/newsletterServices";
 import { fetchFooterStaticPages } from "../services/staticPageService";
 import toast from "react-hot-toast";
+import type { SeoSocialLink } from "../services/seoSettingsService";
 
 export interface FooterLink {
   id: string;
@@ -61,10 +62,12 @@ const FooterClient = ({
   layout,
   whatsapp,
   logoUrl: initialLogoUrl,
+  socialMediaLinks = [],
 }: {
   layout: FooterBlock[];
   whatsapp?: string;
   logoUrl?: string;
+  socialMediaLinks?: SeoSocialLink[];
 }) => {
   const [resolvedLayout, setResolvedLayout] = useState(layout);
   const { settings } = useSettings();
@@ -186,20 +189,48 @@ const FooterClient = ({
                   suppressHydrationWarning
                 />
               </Link>
-              <div className="flex justify-center gap-3 text-[#f8f0b6]">
-                {["Fb", "In", "Pi", "Yt"].map((social, index) => (
-                  <span key={social} className="flex gap-3">
-                    <a
-                      href="#"
-                      target="_blank"
-                      className="text-[15px] transition-colors hover:text-white font-[family-name:var(--font-montserrat)]"
-                    >
-                      {social}
-                    </a>
-                    {index < 3 && <span>-</span>}
-                  </span>
-                ))}
-              </div>
+              {(() => {
+                const platforms = [
+                  { key: "facebook", label: "Fb", name: "Facebook" },
+                  { key: "instagram", label: "In", name: "Instagram" },
+                  { key: "pinterest", label: "Pi", name: "Pinterest" },
+                  { key: "youtube", label: "Yt", name: "YouTube" },
+                ];
+
+                const activeSocials = platforms
+                  .map((item) => {
+                    const match = (socialMediaLinks || []).find(
+                      (s) =>
+                        s?.platform?.trim().toLowerCase() === item.key &&
+                        typeof s?.url === "string" &&
+                        s.url.trim() &&
+                        s.url.trim() !== "#"
+                    );
+                    return { ...item, url: match?.url?.trim() };
+                  })
+                  .filter((s): s is typeof s & { url: string } => Boolean(s.url));
+
+                if (activeSocials.length === 0) return null;
+
+                return (
+                  <div className="flex justify-center gap-3 text-[#f8f0b6]">
+                    {activeSocials.map((social, index) => (
+                      <span key={social.key} className="flex gap-3">
+                        <a
+                          href={social.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={social.name}
+                          className="text-[15px] transition-colors hover:text-white font-[family-name:var(--font-montserrat)]"
+                        >
+                          {social.label}
+                        </a>
+                        {index < activeSocials.length - 1 && <span>-</span>}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="px-0 sm:px-2 lg:col-span-3 lg:px-4">
