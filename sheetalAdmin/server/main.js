@@ -48,22 +48,32 @@ import sanitizeBody from "./middlewares/sanitize.middleware.js";
 const app = express();
 app.set("trust proxy", 1);
 
-const normalizeOrigin = (value = "") => String(value).trim().replace(/\/$/, "");
-const configuredOrigins = [process.env.ALLOWED_ORIGINS, config.frontendDomain]
+const isProduction =
+  (process.env.NODE_ENV || "").trim().toLowerCase() !== "development";
+
+const normalizeOrigin = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\/$/, "");
+
+const isLocalhostOrigin = (origin = "") =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+
+// 1. Environment-configured origins (strip localhost in production)
+const rawConfiguredOrigins = [process.env.ALLOWED_ORIGINS, config.frontendDomain]
   .filter(Boolean)
   .flatMap((value) => value.split(","))
   .map(normalizeOrigin)
   .filter(Boolean);
 
-const localOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:4000",
-  "http://192.168.0.227:3000",
-  "http://192.168.1.10:3000",
-  "http://192.168.0.141:3000",
-  "http://192.168.0.227:4000",
+const envOrigins = isProduction
+  ? rawConfiguredOrigins.filter((origin) => !isLocalhostOrigin(origin))
+  : rawConfiguredOrigins;
+
+// 2. Production known domains (kept until verified in Vercel dashboard)
+const productionKnownOrigins = [
+  "https://studiobysheetal.com",
+  "https://www.studiobysheetal.com",
   "https://sheetal-admin.vercel.app",
   "https://www.sheetal-admin.vercel.app",
   "https://sheetal-omega.vercel.app",
@@ -72,7 +82,35 @@ const localOrigins = [
   "https://sheetal-blue.vercel.app",
 ].map(normalizeOrigin);
 
-const allowedOriginsSet = new Set([...localOrigins, ...configuredOrigins]);
+// 3. Localhost & LAN development origins (strictly excluded in production)
+const devLocalOrigins = isProduction
+  ? []
+  : [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:4000",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+      "http://192.168.0.227:3000",
+      "http://192.168.1.10:3000",
+      "http://192.168.0.141:3000",
+      "http://192.168.0.227:4000",
+    ].map(normalizeOrigin);
+
+const allowedOriginsSet = new Set([
+  ...productionKnownOrigins,
+  ...envOrigins,
+  ...devLocalOrigins,
+]);
+
+// 4. In development only: optional regex matching exact project preview deployments
+const isAllowedDevPreview = (origin) => {
+  if (isProduction) return false;
+  return /^https:\/\/(sheetal-admin|sheetal-omega)(-[a-z0-9_-]+)?\.vercel\.app$/i.test(
+    origin,
+  );
+};
 
 const logDir = "logs";
 if (!fs.existsSync(logDir)) {
@@ -85,24 +123,33 @@ app.use(sanitizeBody);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOriginsSet.has(origin) ||
-        origin.endsWith(".vercel.app")
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server, webhooks)
+      if (!origin) {
+        return callback(null, true);
       }
+
+      const normalized = normalizeOrigin(origin);
+      if (
+        allowedOriginsSet.has(normalized) ||
+        isAllowedDevPreview(normalized)
+      ) {
+        return callback(null, true);
+      }
+
+      // Clean rejection without server crash or 500 error
+      return callback(null, false);
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
       "Authorization",
       "Cookie",
       "X-Session-Token",
+      "Accept",
+      "X-Requested-With",
     ],
+    maxAge: 86400,
   }),
 );
 
