@@ -130,7 +130,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   return (
     <>
       <JsonLd data={schema} />
-      <ProductList categorySlug={category} />
+      <ProductList categorySlug={category} initialCategoryId={cat?._id} />
       <Footer />
     </>
   );

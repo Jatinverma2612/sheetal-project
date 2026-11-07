@@ -74,6 +74,8 @@ const envOrigins = isProduction
 const productionKnownOrigins = [
   "https://studiobysheetal.com",
   "https://www.studiobysheetal.com",
+  "https://sheetal-project.vercel.app",
+  "https://www.sheetal-project.vercel.app",
   "https://sheetal-admin.vercel.app",
   "https://www.sheetal-admin.vercel.app",
   "https://sheetal-omega.vercel.app",
@@ -104,11 +106,11 @@ const allowedOriginsSet = new Set([
   ...devLocalOrigins,
 ]);
 
-// 4. In development only: optional regex matching exact project preview deployments
-const isAllowedDevPreview = (origin) => {
-  if (isProduction) return false;
-  return /^https:\/\/(sheetal-admin|sheetal-omega)(-[a-z0-9_-]+)?\.vercel\.app$/i.test(
-    origin,
+// 4. Vercel deployment matcher (allows production domain, project previews, and any .vercel.app deployment)
+const isVercelOrigin = (origin = "") => {
+  return (
+    origin.endsWith(".vercel.app") ||
+    /^https:\/\/[a-z0-9_-]+\.vercel\.app$/i.test(origin)
   );
 };
 
@@ -131,7 +133,7 @@ app.use(
       const normalized = normalizeOrigin(origin);
       if (
         allowedOriginsSet.has(normalized) ||
-        isAllowedDevPreview(normalized)
+        isVercelOrigin(normalized)
       ) {
         return callback(null, true);
       }

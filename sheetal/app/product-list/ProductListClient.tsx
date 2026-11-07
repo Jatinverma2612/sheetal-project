@@ -31,10 +31,12 @@ import { ORDER_CONFIRMED_EVENT } from "../hooks/shopEvents";
 
 interface ProductListProps {
   categorySlug?: string;
+  initialCategoryId?: string;
 }
 
 const ProductListContent = ({
   categorySlug: propCategorySlug,
+  initialCategoryId,
 }: ProductListProps) => {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -60,9 +62,12 @@ const ProductListContent = ({
     }
   }, [pathname, categorySlug, router, searchParams]);
 
-  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const [isResolvingCategory, setIsResolvingCategory] =
-    useState(!!categorySlug || lookbookCategorySlugs.length > 0);
+  const [categoryId, setCategoryId] = useState<string | undefined>(
+    initialCategoryId,
+  );
+  const [isResolvingCategory, setIsResolvingCategory] = useState(
+    !initialCategoryId && (!!categorySlug || lookbookCategorySlugs.length > 0),
+  );
   const [selectedProductSlug, setSelectedProductSlug] = useState<string | null>(
     null,
   );
@@ -157,6 +162,12 @@ const setViewMode = (mode: "grid" | "list") => {
         return;
       }
 
+      if (initialCategoryId) {
+        setCategoryId(initialCategoryId);
+        setIsResolvingCategory(false);
+        return;
+      }
+
       if (!categorySlug) {
         setCategoryId(undefined);
         setIsResolvingCategory(false);
@@ -171,19 +182,17 @@ const setViewMode = (mode: "grid" | "list") => {
         } else {
           console.warn("Category not found:", categorySlug);
           setCategoryId(undefined);
-          router.replace("/");
         }
       } catch (error) {
         console.error("Error resolving category:", error);
         setCategoryId(undefined);
-        router.replace("/");
       } finally {
         setIsResolvingCategory(false);
       }
     };
 
     resolveCategory();
-  }, [categorySlug, lookbookCategorySlugs.join(",")]);
+  }, [categorySlug, initialCategoryId, lookbookCategorySlugs.join(",")]);
 
   /* =======================
      Fetch Products
