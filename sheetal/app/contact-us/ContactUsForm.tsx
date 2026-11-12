@@ -16,7 +16,10 @@ const INITIAL_FORM: ContactEnquiryPayload = {
 };
 
 const inputClassName =
-  "w-full border border-[#000000a3] rounded-[50px] px-[15px] py-[10px] text-left text-[#727272] bg-[#ffffff36] focus:outline-none";
+  "w-full border border-black/60 rounded-full px-5 py-2.5 text-left text-gray-900 placeholder:text-gray-400 bg-white/95 focus:bg-white focus:outline-none focus:border-[#6a3f07] focus:ring-1 focus:ring-[#6a3f07] transition-all text-[15px]";
+
+const textareaClassName =
+  "w-full border border-black/60 rounded-2xl px-5 py-4 text-left text-gray-900 placeholder:text-gray-400 bg-white/95 focus:bg-white focus:outline-none focus:border-[#6a3f07] focus:ring-1 focus:ring-[#6a3f07] transition-all text-[15px] resize-y leading-relaxed";
 
 const ContactUsForm = () => {
   const [form, setForm] = useState<ContactEnquiryPayload>(INITIAL_FORM);
@@ -155,7 +158,7 @@ const ContactUsForm = () => {
             value={form.query}
             onChange={handleChange}
             placeholder="Message"
-            className={inputClassName}
+            className={textareaClassName}
             required
           />
         </div>
@@ -167,11 +170,11 @@ const ContactUsForm = () => {
         </p>
       )}
 
-      <div className="text-center mt-3 mb-5">
+      <div className="text-center mt-5 mb-5">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="cursor-pointer inline-block w-auto border border-black rounded-[10px] px-[27px] py-[5px] text-[18px] font-normal hover:bg-[#18a149bf] hover:text-white hover:border-[#18a149bf] transition-all bg-transparent disabled:opacity-60 disabled:cursor-not-allowed"
+          className="cursor-pointer inline-block min-w-[130px] border border-black rounded-full px-8 py-2.5 text-[16px] font-medium text-black bg-white hover:bg-black hover:text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
         >
           {isSubmitting ? "Submitting..." : "Submit"}
         </button>

@@ -2,6 +2,16 @@ import ContactEnquiry from "../models/contactEnquiry.model.js";
 import sendEmail from "../utils/sendEmail.js";
 import Settings from "../models/settings.model.js";
 
+const escapeHtml = (str) => {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 // @desc    Submit a contact enquiry
 // @route   POST /api/v1/contact-enquiries
 // @access  Public
@@ -42,6 +52,62 @@ export const createContactEnquiry = async (req, res, next) => {
       phone: trimmedPhone,
       query: query.trim(),
     });
+
+    // Send email notifications to admin support email and auto-acknowledgment to customer
+    try {
+      const settings = await Settings.findOne().lean();
+      const adminRecipient =
+        settings?.supportEmail?.trim() ||
+        process.env.ADMIN_EMAIL ||
+        "info@studiobysheetal.com";
+
+      const adminAlertPromise = sendEmail({
+        email: adminRecipient,
+        subject: `New Contact Enquiry from ${contactEnquiry.name}`,
+        html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+  <h2 style="color: #6a3f07; border-bottom: 2px solid #6a3f07; padding-bottom: 8px;">New Contact Enquiry Received</h2>
+  <p>You have received a new enquiry from the website contact form.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 10px; font-weight: bold; width: 30%;">Name:</td>
+      <td style="padding: 10px;">${escapeHtml(contactEnquiry.name)}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 10px; font-weight: bold;">Email:</td>
+      <td style="padding: 10px;"><a href="mailto:${escapeHtml(contactEnquiry.email)}">${escapeHtml(contactEnquiry.email)}</a></td>
+    </tr>
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 10px; font-weight: bold;">Phone:</td>
+      <td style="padding: 10px;"><a href="tel:${escapeHtml(contactEnquiry.phone)}">${escapeHtml(contactEnquiry.phone)}</a></td>
+    </tr>
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 10px; font-weight: bold; vertical-align: top;">Query:</td>
+      <td style="padding: 10px; white-space: pre-wrap; background-color: #fafafa; border-radius: 4px;">${escapeHtml(contactEnquiry.query)}</td>
+    </tr>
+  </table>
+  <p style="font-size: 13px; color: #777;">This is an automated notification from Studio By Sheetal.</p>
+</div>`,
+      });
+
+      const customerAckPromise = contactEnquiry.email
+        ? sendEmail({
+            email: contactEnquiry.email,
+            subject: "We have received your enquiry - Studio By Sheetal",
+            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+  <h2 style="color: #6a3f07; border-bottom: 2px solid #6a3f07; padding-bottom: 8px;">Thank You for Contacting Us</h2>
+  <p>Dear ${escapeHtml(contactEnquiry.name)},</p>
+  <p>Thank you for reaching out to <strong>Studio By Sheetal</strong>. We have received your query:</p>
+  <div style="padding: 14px; background-color: #f9f6f0; border-left: 4px solid #6a3f07; margin: 16px 0; border-radius: 4px; white-space: pre-wrap;">${escapeHtml(contactEnquiry.query)}</div>
+  <p>Our team is reviewing your message and will get back to you shortly.</p>
+  <p style="margin-top: 24px;">Warm regards,<br><strong>Studio By Sheetal Team</strong></p>
+</div>`,
+          })
+        : Promise.resolve();
+
+      await Promise.allSettled([adminAlertPromise, customerAckPromise]);
+    } catch (emailError) {
+      console.error("Failed to send contact enquiry email notifications:", emailError);
+    }
 
     res.status(201).json({ success: true, contactEnquiry });
   } catch (error) {
