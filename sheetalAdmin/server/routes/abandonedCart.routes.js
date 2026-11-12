@@ -156,7 +156,7 @@ router.get("/settings", isAuthenticated, isAdmin, async (req, res, next) => {
       inactivityMinutes:
         settings?.abandonedCartInactivityMinutes ??
         config.abandonedCart?.inactivityMinutes ??
-        20,
+        1,
       discountPercent:
         settings?.abandonedCartDiscountPercent ??
         config.abandonedCart?.discountPercent ??
