@@ -37,7 +37,7 @@ const sitemapSections = [
       { label: "My Account", href: "/my-account" },
       { label: "Track Order", href: "/my-account/orders" },
       { label: "Return Order", href: "/my-account/orders" },
-      { label: "Saved Addresses", href: "/my-account/address" },
+      { label: "Saved Addresses", href: "/my-account/addresses" },
       { label: "Wishlist", href: "/wishlist" },
       { label: "Shopping Bag", href: "/cart" },
     ],
@@ -89,7 +89,7 @@ export default function SitemapPage() {
                 </h2>
                 <ul className="space-y-2.5">
                   {section.links.map((link) => (
-                    <li key={link.href}>
+                    <li key={`${link.label}-${link.href}`}>
                       <Link
                         href={link.href}
                         className="text-sm text-stone-600 hover:text-[#bd9951] transition-colors block font-[family-name:var(--font-montserrat)] font-light"
