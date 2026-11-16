@@ -44,6 +44,7 @@ export default function ProductModal({
     stock: 0,
     category: "",
     subCategory: "",
+    sizeChart: "",
     status: "Active",
     displayCollections: [],
     wearType: [],
@@ -116,6 +117,15 @@ export default function ProductModal({
     const selectedCategory = categories.find(
       (cat) => cat._id === formData.category,
     );
+
+    if (selectedCategory?.sizeChart && !formData.sizeChart) {
+      setFormData((prev) => ({
+        ...prev,
+        sizeChart:
+          selectedCategory.sizeChart?._id || selectedCategory.sizeChart || "",
+      }));
+    }
+
     const seededSizes = getSeededSizesFromCategory(selectedCategory);
 
     if (seededSizes.length > 0) {
@@ -175,6 +185,7 @@ export default function ProductModal({
           category: initialData.category?._id || initialData.category || "",
           slug: initialData.slug || "",
           subCategory: initialData.subCategory || "",
+          sizeChart: initialData.sizeChart?._id || initialData.sizeChart || "",
           sortOrder: initialData.sortOrder !== undefined ? initialData.sortOrder : 0,
           isTrending: initialData.isTrending ?? false,
           isNewArrival: initialData.isNewArrival ?? false,
@@ -246,6 +257,15 @@ export default function ProductModal({
     const selectedCategory = categories.find(
       (cat) => cat._id === formData.category,
     );
+
+    if (selectedCategory?.sizeChart && !formData.sizeChart) {
+      setFormData((prev) => ({
+        ...prev,
+        sizeChart:
+          selectedCategory.sizeChart?._id || selectedCategory.sizeChart || "",
+      }));
+    }
+
     const seededSizes = getSeededSizesFromCategory(selectedCategory);
 
     if (seededSizes.length === 0) return;

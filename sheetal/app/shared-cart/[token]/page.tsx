@@ -95,10 +95,11 @@ const SharedCartPage = () => {
         setFreeShippingThreshold(Number(settings.freeShippingThreshold) || 0);
 
         const threshold = Number(settings.freeShippingThreshold) || 0;
-        if (summary.discounted > threshold && threshold > 0) {
+        const fee = Number(settings.shippingFee) || 0;
+        if (fee === 0 || (threshold > 0 && summary.discounted >= threshold)) {
           setShippingCharges(0);
         } else {
-          setShippingCharges(Number(settings.shippingFee) || 0);
+          setShippingCharges(fee);
         }
       } catch (err) {
         console.error("Failed to fetch settings", err);
@@ -109,7 +110,7 @@ const SharedCartPage = () => {
   }, [summary.discounted]);
 
   useEffect(() => {
-    if (summary.discounted > freeShippingThreshold && freeShippingThreshold > 0) {
+    if (baseShippingFee === 0 || (freeShippingThreshold > 0 && summary.discounted >= freeShippingThreshold)) {
       setShippingCharges(0);
     } else {
       setShippingCharges(baseShippingFee);

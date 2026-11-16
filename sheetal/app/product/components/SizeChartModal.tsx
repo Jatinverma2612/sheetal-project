@@ -53,6 +53,16 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
     return () => clearTimeout(timer);
   }, [isOpen]);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
   if (!shouldRender) return null;
   if (!sizeChartData) return null;
 
@@ -85,7 +95,7 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999]">
+    <div className={`fixed inset-0 z-[9999] ${isOpen ? "" : "pointer-events-none invisible"}`}>
       <div
         className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -96,23 +106,23 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="size-chart-title"
-        className={`absolute right-0 top-0 h-full w-full max-w-4xl bg-white ${
+        className={`absolute right-0 top-0 h-full w-full max-w-4xl bg-white flex flex-col shadow-2xl transition-transform duration-300 ${
           isOpen ? "animate-slide-in-right" : "animate-slide-out-right"
         }`}
       >
         <button
           onClick={onClose}
           aria-label="Close size chart"
-          className="absolute top-4 right-4 hover:text-gray-800 text-2xl z-10 border px-2 cursor-pointer"
+          className="absolute top-4 right-4 hover:text-gray-800 text-2xl z-10 border px-2 cursor-pointer bg-white/80"
         >
           ×
         </button>
 
-        <div className="p-8">
-          <h3 id="size-chart-title" className="text-4xl text-[#bd9951] font-medium mb-2 font-[family-name:var(--font-optima)] text-center">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 overscroll-contain">
+          <h3 id="size-chart-title" className="text-2xl sm:text-3xl md:text-4xl text-[#bd9951] font-medium mb-2 font-[family-name:var(--font-optima)] text-center">
             Size Chart
           </h3>
-          <p className="text-center mb-6 text-lg">
+          <p className="text-center mb-6 text-xs sm:text-sm md:text-base text-gray-700">
             Our Sizes fit the best for mentioned body measurements (not garment
             measurements)* Tip: SBS sizes are to fit Indian Body.
           </p>
@@ -253,8 +263,8 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-white p-4 flex flex-col items-center border-t border-gray-100">
-          <p className="mb-3 text-gray-700 text-center">
+        <div className="shrink-0 bg-white p-3 sm:p-4 flex flex-col items-center border-t border-gray-200 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <p className="mb-2 text-xs sm:text-sm text-gray-700 text-center font-medium">
             *Select your perfect size from the chart above*
           </p>
           {!selectedSize && (
@@ -262,11 +272,11 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
               Please select a size using the radio buttons above
             </p>
           )}
-          <div className="flex space-x-4 w-full justify-center max-w-md">
+          <div className="flex space-x-3 sm:space-x-4 w-full justify-center max-w-md">
             <button
               onClick={handleAddToCart}
               disabled={!selectedSize || isAddingToCart}
-              className="flex-1 bg-orange-500 text-white font-semibold py-3 px-4 hover:bg-orange-600 transition-colors cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="flex-1 bg-orange-500 text-white font-semibold py-2.5 sm:py-3 px-3 sm:px-4 text-xs sm:text-sm hover:bg-orange-600 transition-colors cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed rounded"
             >
               {isAddingToCart ? "Adding..." : "Add to Cart"}
             </button>
@@ -275,7 +285,7 @@ const SizeChartModal: React.FC<SizeChartModalProps> = ({
                 onAddToWishlist();
                 onClose();
               }}
-              className="flex-1 border font-semibold py-3 px-4 transition-colors cursor-pointer border-orange-500 text-orange-500 hover:bg-orange-50"
+              className="flex-1 border font-semibold py-2.5 sm:py-3 px-3 sm:px-4 text-xs sm:text-sm transition-colors cursor-pointer border-orange-500 text-orange-500 hover:bg-orange-50 rounded"
             >
               {isWishlisted ? "Wishlisted ♥" : "Add to Wishlist"}
             </button>

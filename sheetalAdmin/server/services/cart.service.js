@@ -489,7 +489,7 @@ export const mergeGuestCartService = async (userId, guestItems) => {
     );
 
     if (existingItem) {
-      const desiredQuantity = existingItem.quantity + normalizedQuantity;
+      const desiredQuantity = Math.max(existingItem.quantity, normalizedQuantity);
       ensureCartItemStock(product, existingItem, desiredQuantity);
       existingItem.quantity = desiredQuantity;
       existingItem.price = price;

@@ -2,16 +2,25 @@
 
 import PageHeader from "@/components/admin/layout/PageHeader";
 import {
-  LayoutPanelLeft,
+  Home,
   Image as ImageIcon,
   BookOpen,
   FileText,
   Search,
+  HelpCircle,
+  User as UserIcon,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function CMSPage() {
   const cmsModules = [
+    {
+      title: "Homepage Sections",
+      description: "Manage section visibility, reordering and announcement bar",
+      icon: <Home size={24} />,
+      link: "/admin/cms/homepage",
+      color: "emerald",
+    },
     {
       title: "Homepage Banners",
       description: "Manage hero sliders and promotional banners",
@@ -20,10 +29,10 @@ export default function CMSPage() {
       color: "blue",
     },
     {
-      title: "Lookbooks",
-      description: "Create and edit seasonal style collections",
+      title: "Deals & Offers",
+      description: "Manage homepage deals and special offers",
       icon: <BookOpen size={24} />,
-      link: "/admin/cms/lookbooks",
+      link: "/admin/cms/deals",
       color: "purple",
     },
     {
@@ -34,20 +43,26 @@ export default function CMSPage() {
       color: "emerald",
     },
     {
+      title: "FAQ Management",
+      description: "Create and update frequently asked questions",
+      icon: <HelpCircle size={24} />,
+      link: "/admin/cms/faq",
+      color: "blue",
+    },
+    {
       title: "SEO Settings",
       description: "Manage global website schema and metadata defaults",
       icon: <Search size={24} />,
       link: "/admin/cms/seo-settings",
       color: "orange",
     },
-    // {
-    //   title: "Blog Posts",
-    //   description: "Manage articles (Redirects to WordPress)",
-    //   icon: <ExternalLink size={24} />,
-    //   link: "/admin/cms/blog",
-    //   external: true,
-    //   color: "orange",
-    // },
+    {
+      title: "Testimonials",
+      description: "Manage client reviews and homepage testimonials",
+      icon: <UserIcon size={24} />,
+      link: "/admin/cms/testimonials",
+      color: "purple",
+    },
   ];
 
   return (

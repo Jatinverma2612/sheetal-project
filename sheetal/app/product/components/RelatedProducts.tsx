@@ -70,7 +70,7 @@ const EmblaSlider = ({
           <button
             onClick={scrollPrev}
             aria-label="Previous product"
-            className="absolute left-[-20px] md:left-[-50px] cursor-pointer top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
+            className="absolute left-[-20px] md:left-[-50px] cursor-pointer top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 hidden md:flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
           >
             <Image
               src="/assets/left-image.png"
@@ -83,7 +83,7 @@ const EmblaSlider = ({
           <button
             onClick={scrollNext}
             aria-label="Next product"
-            className="absolute right-[-20px] md:right-[-50px] cursor-pointer top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
+            className="absolute right-[-20px] md:right-[-50px] cursor-pointer top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 hidden md:flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
           >
             <Image
               src="/assets/right-image.png"

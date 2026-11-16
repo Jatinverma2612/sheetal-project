@@ -277,13 +277,19 @@ export const clearGuestCart = () => {
   }
 };
 
+let isMergingGuestCart = false;
+
 /**
  * Merges the guest localStorage cart into the authenticated user's server cart.
  * Should be called immediately after a successful login.
  */
 export const mergeGuestCartOnLogin = async (): Promise<void> => {
+  if (isMergingGuestCart) return;
   const guestItems = readGuestCart();
   if (guestItems.length === 0) return;
+
+  isMergingGuestCart = true;
+  clearGuestCart();
 
   const payload = guestItems.map((g) => ({
     productId: g.productId,
@@ -297,20 +303,10 @@ export const mergeGuestCartOnLogin = async (): Promise<void> => {
 
   try {
     await mergeGuestCartApi(payload);
-
-    // Only clear the local guest cart after the server cart reflects the merge.
-    // This avoids losing the cart if the merge request succeeds but the cart
-    // fetch is briefly stale or the backend fails to persist the items.
-    const verification = await fetchCart();
-    const mergedItems = verification?.success && verification.data && Array.isArray(verification.data.items)
-      ? verification.data.items.filter((item: CartItem) => item.product != null)
-      : [];
-
-    if (mergedItems.length > 0) {
-      clearGuestCart();
-    }
   } catch (err) {
     console.error("Failed to merge guest cart:", err);
+  } finally {
+    isMergingGuestCart = false;
   }
 };
 

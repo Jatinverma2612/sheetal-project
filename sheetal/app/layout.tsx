@@ -109,9 +109,9 @@ export default async function RootLayout({
   ].some(path => pathname === path || pathname.startsWith(path + "/"));
 
   return (
-    <html lang="en">
+    <html lang="en" className="max-w-full overflow-x-hidden">
       <body
-        className={`${optima.variable} ${montserrat.variable} ${outfit.variable} antialiased`}
+        className={`${optima.variable} ${montserrat.variable} ${outfit.variable} antialiased max-w-full overflow-x-hidden relative min-h-screen`}
         style={
           {
             "--font-geist-sans": "var(--font-montserrat), sans-serif",

@@ -36,6 +36,7 @@ const CartPage = () => {
     moveFromCartToWishlist,
     couponCode,
     couponDiscount,
+    couponOfferType,
     couponError,
     couponMeta,
     totalMrp,
@@ -51,7 +52,6 @@ const CartPage = () => {
 
   /* Settings State */
   const [platformFee, setPlatformFee] = useState(0);
-  const [shippingCharges, setShippingCharges] = useState(0);
   const [baseShippingFee, setBaseShippingFee] = useState(0);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
 
@@ -258,40 +258,37 @@ const CartPage = () => {
     router.push(checkoutTarget);
   };
 
-  /* Fetch Settings Once */
+  /* Fetch Settings Once on mount */
   useEffect(() => {
+    let isMounted = true;
     const fetchSettings = async () => {
       try {
         const settings = await getSettings();
+        if (!isMounted) return;
         setPlatformFee(Number(settings.platformFee) || 0);
-
-        const fee = Number(settings.shippingFee) || 0;
-        const threshold = Number(settings.freeShippingThreshold) || 0;
-        const isPrepaidFree = String(settings.prepaidShippingCharge || "").trim().toLowerCase().includes("free");
-
-        setBaseShippingFee(fee);
-        setFreeShippingThreshold(threshold);
-
-        if (fee === 0 || isPrepaidFree || (threshold > 0 && finalAmount >= threshold)) {
-          setShippingCharges(0);
-        } else {
-          setShippingCharges(fee);
-        }
+        setBaseShippingFee(Number(settings.shippingFee) || 0);
+        setFreeShippingThreshold(Number(settings.freeShippingThreshold) || 0);
       } catch (err) {
         console.error("Failed to fetch settings", err);
       }
     };
     fetchSettings();
-  }, [finalAmount]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  /* Recalculate Shipping on Amount Change */
-  useEffect(() => {
-    if (baseShippingFee === 0 || (freeShippingThreshold > 0 && finalAmount >= freeShippingThreshold)) {
-      setShippingCharges(0);
-    } else {
-      setShippingCharges(baseShippingFee);
-    }
-  }, [finalAmount, freeShippingThreshold, baseShippingFee]);
+  const isFreeShippingCoupon =
+    couponOfferType === "FreeShipping" ||
+    (couponMeta as { offerType?: string } | null)?.offerType === "FreeShipping";
+
+  const isFreeShipping =
+    isFreeShippingCoupon ||
+    baseShippingFee === 0 ||
+    (freeShippingThreshold > 0 && finalAmount >= freeShippingThreshold);
+
+  const shippingCharges = isFreeShipping ? 0 : baseShippingFee;
+  const totalAmount = finalAmount + shippingCharges + platformFee;
 
   if (loading) {
     return (
@@ -300,8 +297,6 @@ const CartPage = () => {
       </div>
     );
   }
-
-  const totalAmount = finalAmount + shippingCharges + platformFee;
 
   const categoryNames =
     applicableCategories.length > 0

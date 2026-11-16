@@ -99,9 +99,9 @@ const generateNgrams = (text) => {
       for (let i = 1; i <= w.length; i++) {
         grams.add(w.slice(0, i));
       }
-      // Generate exact infixes (length >= 1)
+      // Generate exact infixes (length >= 3 to prevent 1-2 char false matches like "pa" in "dupatta")
       for (let start = 1; start < w.length; start++) {
-        for (let len = 1; start + len <= w.length; len++) {
+        for (let len = 3; start + len <= w.length; len++) {
           grams.add(w.substr(start, len));
         }
       }
@@ -812,33 +812,51 @@ export const searchNgram = async (query, options = {}) => {
         finalScore = Math.max(finalScore, nameMatch.score);
       }
 
-      // ── Tier 4: SubCategory ────────────────────────────────────────
-      if (normSubCat) {
-        const subCatMatch = scoreNameMatch(
-          normQ,
-          normSubCat,
-          TIER.PRODUCT_SUBCATEGORY,
-          { allowFuzzy: false },
-        );
-        if (subCatMatch) finalScore = Math.max(finalScore, subCatMatch.score);
-      }
+      // For short queries (< 3 chars), skip Tier 4 (SubCategory) and Tier 5 (Attributes / Tags).
+      // Only Tier 1 (Product Name starts with query), Tier 2 (Product Name contains query),
+      // and Tier 3 / Category Name prefix are allowed for 1-2 character queries.
+      if (queryLen >= 3) {
+        // ── Tier 4: SubCategory ────────────────────────────────────────
+        if (normSubCat) {
+          const subCatMatch = scoreNameMatch(
+            normQ,
+            normSubCat,
+            TIER.PRODUCT_SUBCATEGORY,
+            { allowFuzzy: false },
+          );
+          if (subCatMatch) finalScore = Math.max(finalScore, subCatMatch.score);
+        }
 
-      // ── Tier 4 (also): Category name on product ────────────────────
-      if (normCatName) {
-        const catOnProductMatch = scoreNameMatch(
-          normQ,
-          normCatName,
-          TIER.PRODUCT_SUBCATEGORY,
-          { allowFuzzy: false },
-        );
-        if (catOnProductMatch)
-          finalScore = Math.max(finalScore, catOnProductMatch.score);
-      }
+        // ── Tier 4 (also): Category name on product ────────────────────
+        if (normCatName) {
+          const catOnProductMatch = scoreNameMatch(
+            normQ,
+            normCatName,
+            TIER.PRODUCT_SUBCATEGORY,
+            { allowFuzzy: false },
+          );
+          if (catOnProductMatch)
+            finalScore = Math.max(finalScore, catOnProductMatch.score);
+        }
 
-      // ── Tier 5: Attributes / Tags ──────────────────────────────────
-      const attrBonus = scoreAttributeMatch(doc, normQ);
-      if (attrBonus > 0) {
-        finalScore = Math.max(finalScore, TIER.PRODUCT_ATTRIBUTE + attrBonus);
+        // ── Tier 5: Attributes / Tags ──────────────────────────────────
+        const attrBonus = scoreAttributeMatch(doc, normQ);
+        if (attrBonus > 0) {
+          finalScore = Math.max(finalScore, TIER.PRODUCT_ATTRIBUTE + attrBonus);
+        }
+      } else if (normCatName) {
+        // For short queries (<= 2 chars), only match category if category name word starts with query
+        const catWords = normCatName.split(" ").filter(Boolean);
+        if (catWords.some((w) => w.startsWith(normQ))) {
+          const catOnProductMatch = scoreNameMatch(
+            normQ,
+            normCatName,
+            TIER.PRODUCT_SUBCATEGORY,
+            { allowFuzzy: false },
+          );
+          if (catOnProductMatch)
+            finalScore = Math.max(finalScore, catOnProductMatch.score);
+        }
       }
 
       // Drop products that didn't match in any tier
@@ -851,7 +869,11 @@ export const searchNgram = async (query, options = {}) => {
       });
       if (catMatch) {
         finalScore = catMatch.score;
-      } else if (Array.isArray(doc.subCategories) && doc.subCategories.length > 0) {
+      } else if (
+        queryLen >= 3 &&
+        Array.isArray(doc.subCategories) &&
+        doc.subCategories.length > 0
+      ) {
         for (const sub of doc.subCategories) {
           const subMatch = scoreNameMatch(
             normQ,
@@ -962,11 +984,28 @@ export const searchNgram = async (query, options = {}) => {
 
 export const syncToIndex = async (item, type) => {
   try {
+    let resolvedItem = item;
+    if (type === "product" && item) {
+      if (item.category && !item.category.name) {
+        const catId = item.category._id || item.category;
+        try {
+          const cat = await Category.findById(catId).select("name").lean();
+          if (cat) {
+            const raw = item.toObject ? item.toObject() : { ...item };
+            raw.category = {
+              ...(typeof item.category === "object" ? item.category : {}),
+              name: cat.name,
+            };
+            resolvedItem = raw;
+          }
+        } catch (_) {}
+      }
+    }
     const doc =
       type === "product"
-        ? buildProductDoc(item)
+        ? buildProductDoc(resolvedItem)
         : type === "category"
-          ? buildCategoryDoc(item)
+          ? buildCategoryDoc(resolvedItem)
           : null;
     if (doc) upsertDocumentIntoIndex(doc);
   } catch (err) {

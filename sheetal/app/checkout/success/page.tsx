@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   dispatchCartUpdated,
   dispatchOrderConfirmed,
@@ -66,6 +66,7 @@ const StatusShell = ({
 );
 
 const SuccessContent = () => {
+  const router = useRouter();
   const { settings } = useSettings();
   const logoUrl = getLogoUrl(settings);
   const searchParams = useSearchParams();
@@ -173,8 +174,21 @@ const SuccessContent = () => {
   }, [verifyError, verifying]);
 
   const invoiceHref = invoiceOrderId
-    ? `/checkout/download-invoice?orderId=${encodeURIComponent(invoiceOrderId)}`
-    : "/checkout/download-invoice";
+    ? `/checkout/download-invoice?orderId=${encodeURIComponent(invoiceOrderId)}&auto=true`
+    : "/checkout/download-invoice?auto=true";
+
+  const handleDownloadInvoice = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    try {
+      const win = window.open(invoiceHref, "_blank", "noopener,noreferrer");
+      if (!win || win.closed || typeof win.closed === "undefined") {
+        router.push(invoiceHref);
+      }
+      e.preventDefault();
+    } catch {
+      router.push(invoiceHref);
+      e.preventDefault();
+    }
+  };
 
   const eyebrow = verifying
     ? "Finalizing Order"
@@ -284,13 +298,15 @@ const SuccessContent = () => {
 
                 <div className="grid gap-3">
                   {!verifying && !verifyError && (
-                    <Link
+                    <a
                       href={invoiceHref}
+                      onClick={handleDownloadInvoice}
                       target="_blank"
-                      className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#bd9951] px-5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#a8843f]"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#bd9951] px-5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#a8843f] cursor-pointer"
                     >
                       Download Invoice
-                    </Link>
+                    </a>
                   )}
                   <Link
                     href="/"

@@ -733,8 +733,8 @@ const MobileMenuOverlay = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[10000] bg-black/60 transition-opacity duration-300 md:hidden ${
-        isOpen ? "opacity-100 visible" : "opacity-0 invisible"
+      className={`fixed inset-0 z-[10000] bg-black/60 overflow-hidden transition-opacity duration-300 md:hidden ${
+        isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       }`}
     >
       <nav
@@ -1103,11 +1103,16 @@ const NavbarInner = ({
 
   const handleMouseEnterUser = () => setIsUserDropdownOpen(true);
   const handleMouseLeaveUser = () => setIsUserDropdownOpen(false);
-  const handleLogout = () => {
-    logout();
-    setCurrentUser(null);
-    toast.success("You have been logged out.");
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors
+    } finally {
+      setCurrentUser(null);
+      toast.success("You have been logged out.");
+      window.location.href = "/login";
+    }
   };
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);

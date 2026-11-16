@@ -134,17 +134,20 @@ const BookAppointmentWidget: React.FC = () => {
   return (
     <>
       {/* Floating trigger */}
-      <div className="fixed bottom-18 right-6" style={{ zIndex: 9998, isolation: "isolate" }}>
+      <div
+        className="fixed bottom-16 sm:bottom-20 right-3 sm:right-6 md:right-8"
+        style={{ zIndex: 9998, isolation: "isolate" }}
+      >
         <div className="relative inline-block">
           <span
-            className="absolute -top-2 left-0 px-1.5 text-[10px] uppercase text-black font-extrabold font-[family-name:var(--font-montserrat)] whitespace-nowrap"
+            className="absolute -top-2 left-0 px-1 sm:px-1.5 text-[9px] sm:text-[10px] uppercase text-black font-extrabold font-[family-name:var(--font-montserrat)] whitespace-nowrap"
             style={{ background: "#ffffff", zIndex: "99" }}
           >
             For Customization
           </span>
           <button
             onClick={() => setIsOpen(true)}
-            className="border border-black shadow-lg px-4 py-2.5 text-[12px] font-[family-name:var(--font-montserrat)] font-bold transition-colors tracking-wide whitespace-nowrap cursor-pointer"
+            className="border border-black shadow-lg px-3 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-[12px] font-[family-name:var(--font-montserrat)] font-bold transition-all hover:scale-105 active:scale-95 tracking-wide whitespace-nowrap cursor-pointer"
             style={{
               background: "rgba(189, 153, 81, 0.15)",
               backdropFilter: "blur(80px)",

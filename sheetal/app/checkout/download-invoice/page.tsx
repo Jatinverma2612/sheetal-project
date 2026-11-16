@@ -118,12 +118,12 @@ const fmtDate = (iso: string) =>
 
 const shortId = (id: string) => id.slice(-10).toUpperCase();
 
-const formatPaymentMode = (paymentInfo: Order["paymentInfo"]) => {
-  if (paymentInfo.displayMethod?.trim()) {
+const formatPaymentMode = (paymentInfo?: Order["paymentInfo"] | null) => {
+  if (paymentInfo?.displayMethod?.trim()) {
     return paymentInfo.displayMethod.trim();
   }
 
-  return paymentInfo.method === "COD" ? "Cash on Delivery" : "Online";
+  return paymentInfo?.method === "COD" ? "Cash on Delivery" : "Online";
 };
 
 const formatAddressLines = (address: BasicInfoAddress) => {
@@ -159,6 +159,20 @@ const InvoicePageInner = () => {
 
     const { settings } = useSettings();
     const logoUrl = getLogoUrl(settings);
+    const autoPrint = searchParams.get("auto") === "true";
+
+  useEffect(() => {
+    if (!loading && order && !error && autoPrint) {
+      const timer = setTimeout(() => {
+        try {
+          window.print();
+        } catch {
+          // Ignore automatic print suppression
+        }
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, order, error, autoPrint]);
 
   useEffect(() => {
     const storedOrderId = sessionStorage.getItem(INVOICE_ORDER_ID_KEY);
@@ -286,13 +300,49 @@ const InvoicePageInner = () => {
   const orderDate = fmtDate(order.createdAt);
   const invoiceNumber = `I${shortId(order._id)}`;
   const paymentMode = formatPaymentMode(order.paymentInfo);
+  const shippingAddress = order.shippingAddress || ({} as Order["shippingAddress"]);
   const shippingAddressLines = [
-    order.shippingAddress.addressLine1,
-    `${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.postalCode}`,
-    order.shippingAddress.country,
-  ];
+    shippingAddress.addressLine1,
+    [shippingAddress.city, shippingAddress.state].filter(Boolean).join(", "),
+    [shippingAddress.postalCode, shippingAddress.country].filter(Boolean).join(" "),
+  ].filter(Boolean);
   const billingAddressLines = formatAddressLines(basicInfo.billingAddress);
   const shippingOfficeLines = formatAddressLines(basicInfo.shippingAddress);
+
+  const handleDownloadHtmlInvoice = () => {
+    const invoiceEl = document.getElementById("tax-invoice-printable");
+    if (!invoiceEl) {
+      window.print();
+      return;
+    }
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tax Invoice - ${order?._id || orderId}</title>
+  <style>
+    * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; }
+    body { margin: 24px; padding: 0; background: #fff; color: #111; }
+    table { width: 100%; border-collapse: collapse; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+  ${invoiceEl.outerHTML}
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Invoice_${invoiceNumber || orderId}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -302,7 +352,40 @@ const InvoicePageInner = () => {
         @media print { .no-print { display: none !important; } }
       `}</style>
 
-      <div className="m-5 bg-white">
+      <div className="no-print mx-5 mt-4 mb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg bg-gray-100 p-4 border border-gray-200">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Order Invoice</h2>
+          <p className="text-xs text-gray-500">Order ID: #{order?._id || orderId}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 rounded-md bg-[#bd9951] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#a8843f] transition-all cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print / Save as PDF
+          </button>
+          <button
+            onClick={handleDownloadHtmlInvoice}
+            className="flex items-center gap-2 rounded-md border border-[#bd9951] bg-white px-4 py-2.5 text-sm font-semibold text-[#8d6b2f] shadow-sm hover:bg-[#fcf8f1] transition-all cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download Invoice (.html)
+          </button>
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-all cursor-pointer"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+
+      <div id="tax-invoice-printable" className="m-5 bg-white">
         <div className="w-full border border-[#01008b47]">
           <div className="px-[30px] pt-[36px] pb-[42px]">
             <table className="w-full border-collapse mb-0">
@@ -574,7 +657,7 @@ const InvoicePageInner = () => {
                               </strong>
                             </p>
                             <p className="leading-[25px] my-4">
-                              <strong>{order.shippingAddress.fullName}</strong>
+                              <strong>{shippingAddress.fullName || "Customer"}</strong>
                               <br />
                               {shippingAddressLines.map((line) => (
                                 <span key={line}>
@@ -584,11 +667,11 @@ const InvoicePageInner = () => {
                               ))}
                             </p>
                             <p className="my-4">
-                              <strong>Email:</strong> {order.user.email}
+                              <strong>Email:</strong> {order.user?.email || (order as any)?.email || "Not specified"}
                             </p>
                             <p className="my-4">
                               <strong>Phone no.:</strong>{" "}
-                              {order.shippingAddress.phoneNumber}
+                              {shippingAddress.phoneNumber || "Not specified"}
                             </p>
                           </td>
                           <td className="align-top text-[16px] text-[#111111]">
@@ -598,7 +681,7 @@ const InvoicePageInner = () => {
                               </strong>
                             </p>
                             <p className="leading-[25px] my-4">
-                              <strong>{order.shippingAddress.fullName}</strong>
+                              <strong>{shippingAddress.fullName || "Customer"}</strong>
                               <br />
                               {shippingAddressLines.map((line) => (
                                 <span key={line}>
@@ -608,11 +691,11 @@ const InvoicePageInner = () => {
                               ))}
                             </p>
                             <p className="my-4">
-                              <strong>Email:</strong> {order.user.email}
+                              <strong>Email:</strong> {order.user?.email || (order as any)?.email || "Not specified"}
                             </p>
                             <p className="my-4">
                               <strong>Phone no.:</strong>{" "}
-                              {order.shippingAddress.phoneNumber}
+                              {shippingAddress.phoneNumber || "Not specified"}
                             </p>
                           </td>
                         </tr>

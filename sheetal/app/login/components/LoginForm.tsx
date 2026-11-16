@@ -81,7 +81,38 @@ const LoginForm = ({
 
   useEffect(() => {
     syncRedirectFromQuery(searchParams.get("redirect"));
+    resetRecaptcha(RECAPTCHA_CONTAINER_ID);
+    return () => {
+      resetRecaptcha(RECAPTCHA_CONTAINER_ID);
+    };
   }, [searchParams]);
+
+  // Handle returning from redirect sign-in (fallback for popup-blocked)
+  useEffect(() => {
+    let isMounted = true;
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!isMounted || !result?.user) return;
+        setLoading(true);
+        try {
+          const idToken = await result.user.getIdToken();
+          await completeSocialLogin(idToken);
+        } catch (err) {
+          console.error("Redirect login processing error:", err);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (err?.code !== "auth/null-user") {
+          console.error("Redirect sign-in error:", err);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
 
 
@@ -276,6 +307,22 @@ const LoginForm = ({
       const firebaseError = error as { code?: string; message?: string };
       console.error("Google Login Error:", error);
       if (
+        firebaseError.code === "auth/popup-blocked" ||
+        firebaseError.message?.includes("popup-blocked")
+      ) {
+        try {
+          toast.loading("Popup blocked. Redirecting to Google Sign-In...", {
+            duration: 3000,
+          });
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError) {
+          console.error("Google redirect sign-in failed:", redirectError);
+        }
+      } else if (firebaseError.code === "auth/popup-closed-by-user") {
+        // User closed the popup intentionally
+        return;
+      } else if (
         firebaseError.code === "auth/account-exists-with-different-credential"
       ) {
         toast.error(
@@ -308,6 +355,19 @@ const LoginForm = ({
       const firebaseError = error as { code?: string; message?: string };
       console.error("Facebook Login Error:", error);
       if (
+        firebaseError.code === "auth/popup-blocked" ||
+        firebaseError.message?.includes("popup-blocked")
+      ) {
+        try {
+          toast.loading("Popup blocked. Redirecting to Facebook Sign-In...", {
+            duration: 3000,
+          });
+          await signInWithRedirect(auth, facebookProvider);
+          return;
+        } catch (redirectError) {
+          console.error("Facebook redirect sign-in failed:", redirectError);
+        }
+      } else if (
         firebaseError.code === "auth/account-exists-with-different-credential"
       ) {
         toast.error(

@@ -88,7 +88,6 @@ const AddressPageInner = () => {
   const pendingPaymentActionRef = useRef<(() => Promise<void>) | null>(null);
 
   const [platformFee, setPlatformFee] = useState(0);
-  const [shippingCharges, setShippingCharges] = useState(0);
   const [baseShippingFee, setBaseShippingFee] = useState(0);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
 
@@ -256,6 +255,14 @@ const AddressPageInner = () => {
     : applicableCategories;
 
   const netItemsTotal = Math.max(0, grossItemsTotal - effectiveCouponDiscount);
+  const isFreeShippingCoupon =
+    (effectiveCouponMeta as { offerType?: string } | null)?.offerType ===
+    "FreeShipping";
+  const isFreeShipping =
+    isFreeShippingCoupon ||
+    baseShippingFee === 0 ||
+    (freeShippingThreshold > 0 && netItemsTotal >= freeShippingThreshold);
+  const shippingCharges = isFreeShipping ? 0 : baseShippingFee;
   const totalAmount = netItemsTotal + shippingCharges + platformFee;
   const totalWithoutCoupon = totalAmount + effectiveCouponDiscount;
 
@@ -341,37 +348,23 @@ const AddressPageInner = () => {
   }, [fetchAddresses]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchSettingsData = async () => {
       try {
         const settings = await getSettings();
+        if (!isMounted) return;
         setPlatformFee(Number(settings.platformFee) || 0);
-
-        const fee = Number(settings.shippingFee) || 0;
-        const threshold = Number(settings.freeShippingThreshold) || 0;
-        const isPrepaidFree = String(settings.prepaidShippingCharge || "").trim().toLowerCase().includes("free");
-
-        setBaseShippingFee(fee);
-        setFreeShippingThreshold(threshold);
-
-        if (fee === 0 || isPrepaidFree || (threshold > 0 && netItemsTotal >= threshold)) {
-          setShippingCharges(0);
-        } else {
-          setShippingCharges(fee);
-        }
+        setBaseShippingFee(Number(settings.shippingFee) || 0);
+        setFreeShippingThreshold(Number(settings.freeShippingThreshold) || 0);
       } catch (err) {
         console.error("Failed to fetch settings", err);
       }
     };
     fetchSettingsData();
-  }, [netItemsTotal]);
-
-  useEffect(() => {
-    if (baseShippingFee === 0 || (freeShippingThreshold > 0 && netItemsTotal >= freeShippingThreshold)) {
-      setShippingCharges(0);
-    } else {
-      setShippingCharges(baseShippingFee);
-    }
-  }, [netItemsTotal, freeShippingThreshold, baseShippingFee]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleEditAddress = (address: Address) => {
     setEditingAddress(address);

@@ -96,7 +96,7 @@ const ProductListBanner: React.FC<ProductListBannerProps> = ({
     ? `Showing results for: ${trimmedSearchQuery}`
     : category?.categoryBanner || "";
   const title = isSearchPage
-    ? category?.name || trimmedSearchQuery
+    ? `Results for "${trimmedSearchQuery}"`
     : category?.name || "Collection";
   const description =
     (isSearchPage

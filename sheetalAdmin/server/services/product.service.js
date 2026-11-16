@@ -4,6 +4,7 @@ import Color from "../models/color.model.js";
 import Order from "../models/order.model.js";
 import ProductView from "../models/productView.model.js";
 import Category from "../models/category.model.js";
+import SizeChart from "../models/sizechart.model.js";
 import Homepage from "../models/homepage.model.js";
 import { deleteFile, deleteS3File, uploadS3File } from "../utils/fileHelper.js";
 import { deleteStorageAsset } from "../storage/index.js";
@@ -635,9 +636,14 @@ export const getAllProductsService = async (queryStr) => {
           return { [sort]: 1 };
         })();
 
-        return sort === "price_asc" || sort === "price_desc"
-          ? { ...searchSort, ...userSort }
-          : { isStarred: -1, ...userSort, ...searchSort };
+        if (sort === "price_asc" || sort === "price_desc") {
+          return { ...userSort, ...searchSort };
+        }
+        if (sort === "popularity") {
+          return { ...userSort, ...searchSort };
+        }
+        // When searching, search relevance rank MUST precede creation timestamp
+        return { isStarred: -1, ...searchSort, ...userSort };
       })(),
     },
   ];
@@ -736,7 +742,7 @@ export const getProductDetailsService = async (id) => {
   let product = await Product.findOne(query)
     .populate({
       path: "category",
-      select: "name slug sizeChart",
+      select: "name slug sizeChart sizeMode",
       populate: {
         path: "sizeChart",
       },
@@ -754,7 +760,7 @@ export const getProductDetailsService = async (id) => {
     product = await Product.findOne({ previousSlugs: lookupSlug })
       .populate({
         path: "category",
-        select: "name slug sizeChart",
+        select: "name slug sizeChart sizeMode",
         populate: {
           path: "sizeChart",
         },
@@ -770,6 +776,56 @@ export const getProductDetailsService = async (id) => {
 
     if (product) {
       resolvedFromSlug = lookupSlug;
+    }
+  }
+
+  if (product) {
+    // If neither product.sizeChart nor product.category.sizeChart is set,
+    // and product has sized variants, auto-resolve a matching or fallback size chart
+    if (!product.sizeChart && !product.category?.sizeChart) {
+      const hasSizedVariants =
+        Array.isArray(product.variants) &&
+        product.variants.some((v) =>
+          Array.isArray(v.sizes) &&
+          v.sizes.some((s) => {
+            const name = String(s?.name || "").trim().toLowerCase();
+            return name && name !== "free size" && name !== "one size";
+          }),
+        );
+
+      if (hasSizedVariants) {
+        const catName = product.category?.name || product.subCategory || "";
+        let fallbackChart = null;
+        if (catName) {
+          fallbackChart = await SizeChart.findOne({
+            name: { $regex: new RegExp(catName, "i") },
+          }).lean();
+        }
+        if (!fallbackChart) {
+          fallbackChart = await SizeChart.findOne()
+            .sort({ createdAt: -1 })
+            .lean();
+        }
+        if (!fallbackChart) {
+          fallbackChart = {
+            _id: "default-size-chart",
+            name: "Standard Size Chart",
+            headers: ["Size", "Bust", "Waist", "Hip", "Length"],
+            table: [
+              { label: "XS", cells: ["XS", "32", "26", "36", "44"] },
+              { label: "S", cells: ["S", "34", "28", "38", "44"] },
+              { label: "M", cells: ["M", "36", "30", "40", "45"] },
+              { label: "L", cells: ["L", "38", "32", "42", "45"] },
+              { label: "XL", cells: ["XL", "40", "34", "44", "46"] },
+              { label: "XXL", cells: ["XXL", "42", "36", "46", "46"] },
+              { label: "3XL", cells: ["3XL", "44", "38", "48", "46"] },
+            ],
+            howToMeasureImage: { url: "/assets/Apparel-Illustration.svg" },
+            unit: "in",
+          };
+        }
+        product.sizeChart = fallbackChart;
+      }
     }
   }
 
@@ -853,11 +909,26 @@ export const createProductService = async (data, files, userId) => {
 
   if (parsedData.category) {
     const category = await Category.findById(parsedData.category).select(
-      "gstPercent noGst",
+      "gstPercent noGst sizeChart sizeMode",
     );
     parsedData.gstPercent = category?.noGst
       ? 0
       : (category?.gstPercent || (await getGlobalTax()));
+
+    if (!parsedData.sizeChart && category?.sizeChart) {
+      parsedData.sizeChart = category.sizeChart;
+    }
+  }
+
+  // Ensure newly created products have a size chart assigned
+  if (!parsedData.sizeChart) {
+    const defaultChart = await SizeChart.findOne()
+      .sort({ createdAt: -1 })
+      .select("_id")
+      .lean();
+    if (defaultChart) {
+      parsedData.sizeChart = defaultChart._id;
+    }
   }
 
   parsedData.description = sanitizeProductHtml(parsedData.description || "");
@@ -1003,6 +1074,7 @@ export const createProductService = async (data, files, userId) => {
     createdBy: userId,
   });
 
+  await product.populate("category", "name slug");
   await syncToIndex(product, "product");
   await product.populate("variants.colorId");
 
@@ -1087,11 +1159,26 @@ export const updateProductService = async (id, data, files) => {
 
   if (parsedData.category) {
     const category = await Category.findById(parsedData.category).select(
-      "gstPercent noGst",
+      "gstPercent noGst sizeChart sizeMode",
     );
     parsedData.gstPercent = category?.noGst
       ? 0
       : (category?.gstPercent || (await getGlobalTax()));
+
+    if (!parsedData.sizeChart && category?.sizeChart) {
+      parsedData.sizeChart = category.sizeChart;
+    }
+  }
+
+  // Ensure newly created products have a size chart assigned
+  if (!parsedData.sizeChart) {
+    const defaultChart = await SizeChart.findOne()
+      .sort({ createdAt: -1 })
+      .select("_id")
+      .lean();
+    if (defaultChart) {
+      parsedData.sizeChart = defaultChart._id;
+    }
   }
 
   parsedData.description = sanitizeProductHtml(parsedData.description || "");
@@ -1281,7 +1368,7 @@ export const updateProductService = async (id, data, files) => {
     id,
     { $set: { ...parsedData, stock: totalStock } },
     { new: true, runValidators: true },
-  ).populate("category", "slug");
+  ).populate("category", "name slug");
 
   await syncToIndex(updatedProduct, "product");
 

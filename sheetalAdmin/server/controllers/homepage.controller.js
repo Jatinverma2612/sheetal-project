@@ -26,13 +26,13 @@ const defaultTopInfoConfig = {
 const initializeHomepageIfEmpty = async (homepage) => {
   let updated = false;
 
-  // Initialize Hidden Beauty categories if empty
-  if (!homepage.hiddenBeauty?.categories?.length) {
+  // Initialize Hidden Beauty categories only if undefined or null (respects admin configuration)
+  if (homepage.hiddenBeauty?.categories === undefined || homepage.hiddenBeauty?.categories === null) {
     const categories = await Category.find({ isActive: true })
       .sort({ order: 1 })
       .limit(10);
     homepage.hiddenBeauty = {
-      ...homepage.hiddenBeauty,
+      ...(homepage.hiddenBeauty?.toObject?.() || homepage.hiddenBeauty),
       categories: categories.map((c) => c._id),
     };
     updated = true;
@@ -126,33 +126,12 @@ export const getSections = async (req, res, next) => {
         .lean(),
     ]);
 
-    // Build section list: only include products that currently have the flag = true
+    // Build section list: prioritize explicitly curated products from Homepage CMS
     const buildSectionProducts = (curatedProducts, flaggedList) => {
-      const flaggedMap = new Map(flaggedList.map((p) => [p._id.toString(), p]));
-      const result = [];
-      const seenIds = new Set();
-
-      // First add curated products that still have the flag = true and are in stock/active
-      (curatedProducts || []).forEach((p) => {
-        if (!p) return;
-        const pId = (p._id || p).toString();
-        const flaggedItem = flaggedMap.get(pId);
-        if (flaggedItem && isAvailableProductForPublic(flaggedItem)) {
-          result.push(flaggedItem);
-          seenIds.add(pId);
-        }
-      });
-
-      // Then add any newly flagged products not yet in curated list
-      flaggedList.forEach((p) => {
-        const pId = p._id.toString();
-        if (!seenIds.has(pId) && isAvailableProductForPublic(p)) {
-          result.push(p);
-          seenIds.add(pId);
-        }
-      });
-
-      return result;
+      if (Array.isArray(curatedProducts) && curatedProducts.length > 0) {
+        return curatedProducts.filter(isAvailableProductForPublic);
+      }
+      return (flaggedList || []).filter(isAvailableProductForPublic);
     };
 
     const filteredTrending = {
@@ -258,18 +237,53 @@ export const updateSections = async (req, res, next) => {
           ...topInfoConfig,
         };
       }
-      if (aboutSBS) homepage.aboutSBS = { ...homepage.aboutSBS, ...aboutSBS };
-      if (hiddenBeauty)
-        homepage.hiddenBeauty = { ...homepage.hiddenBeauty, ...hiddenBeauty };
-      if (collections)
-        homepage.collections = { ...homepage.collections, ...collections };
-      if (trendingThisWeek)
+      if (aboutSBS) {
+        homepage.aboutSBS = {
+          ...(homepage.aboutSBS?.toObject?.() || homepage.aboutSBS),
+          ...aboutSBS,
+        };
+        homepage.markModified("aboutSBS");
+      }
+      if (hiddenBeauty) {
+        homepage.hiddenBeauty = {
+          ...(homepage.hiddenBeauty?.toObject?.() || homepage.hiddenBeauty),
+          ...hiddenBeauty,
+        };
+        if (Array.isArray(hiddenBeauty.categories)) {
+          homepage.hiddenBeauty.categories = hiddenBeauty.categories;
+        }
+        homepage.markModified("hiddenBeauty");
+      }
+      if (collections) {
+        homepage.collections = {
+          ...(homepage.collections?.toObject?.() || homepage.collections),
+          ...collections,
+        };
+        if (Array.isArray(collections.products)) {
+          homepage.collections.products = collections.products;
+        }
+        homepage.markModified("collections");
+      }
+      if (trendingThisWeek) {
         homepage.trendingThisWeek = {
-          ...homepage.trendingThisWeek,
+          ...(homepage.trendingThisWeek?.toObject?.() || homepage.trendingThisWeek),
           ...trendingThisWeek,
         };
-      if (newArrivals)
-        homepage.newArrivals = { ...homepage.newArrivals, ...newArrivals };
+        if (Array.isArray(trendingThisWeek.products)) {
+          homepage.trendingThisWeek.products = trendingThisWeek.products;
+        }
+        homepage.markModified("trendingThisWeek");
+      }
+      if (newArrivals) {
+        homepage.newArrivals = {
+          ...(homepage.newArrivals?.toObject?.() || homepage.newArrivals),
+          ...newArrivals,
+        };
+        if (Array.isArray(newArrivals.products)) {
+          homepage.newArrivals.products = newArrivals.products;
+        }
+        homepage.markModified("newArrivals");
+      }
       if (instagramDiaries)
         homepage.instagramDiaries = {
           ...homepage.instagramDiaries,

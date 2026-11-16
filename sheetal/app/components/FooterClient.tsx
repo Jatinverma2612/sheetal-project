@@ -346,7 +346,7 @@ const FooterClient = ({
           </div>
         </div>
 
-        <div className="border-t border-dashed border-[#2c2c2c] bg-[#faf8fc0d] py-3">
+        <div className="border-t border-dashed border-[#2c2c2c] bg-[#faf8fc0d] py-3 pb-24 sm:pb-3">
           <div className="container mx-auto px-4 text-left text-[13px] text-[#f8f0b4] sm:px-6">
             Copyright 2026 © Studio By Sheetal, All Rights Reserved.
           </div>
@@ -356,7 +356,8 @@ const FooterClient = ({
       {showBackToTop && (
         <a
           href="#"
-          className="fixed bottom-[20px] right-[30px] z-50 flex h-[40px] w-[40px] items-center justify-center rounded-full border border-[#90c03e] text-[#90c03e] transition-colors"
+          className="fixed bottom-[18px] right-[14px] sm:bottom-[24px] sm:right-[30px] z-50 flex h-[38px] w-[38px] sm:h-[40px] sm:w-[40px] items-center justify-center rounded-full border border-[#90c03e] text-[#90c03e] bg-white/80 backdrop-blur-sm transition-all hover:scale-110 active:scale-95"
+          aria-label="Back to top"
         >
           <ArrowUp />
         </a>
@@ -367,14 +368,14 @@ const FooterClient = ({
         href={`https://api.whatsapp.com/send?phone=${finalWhatsapp}`}
         rel="noopener"
         aria-label="Chat on WhatsApp"
-        className="fixed bottom-[84px] left-[18px] z-[999] block transition-transform hover:scale-110 active:scale-95"
+        className="fixed bottom-4 left-3 sm:bottom-6 sm:left-6 z-[999] block transition-transform hover:scale-110 active:scale-95"
       >
         <Image
           src="/assets/icons/whatsapp.png"
           alt="WhatsApp chat"
-          width={60}
-          height={60}
-          className="h-[60px] w-[60px] object-contain drop-shadow-md"
+          width={56}
+          height={56}
+          className="h-12 w-12 sm:h-14 sm:w-14 object-contain drop-shadow-md"
           unoptimized
           priority
         />

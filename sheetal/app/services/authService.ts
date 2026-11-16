@@ -1,5 +1,7 @@
 import Cookies from "js-cookie";
 import { apiFetch } from "./api";
+import { signOut } from "firebase/auth";
+import { auth, resetRecaptcha } from "./firebase";
 
 export const TOKEN_KEY = "token";
 const USER_KEY = "user_details";
@@ -119,12 +121,26 @@ export const login = (token: string, user: User) => {
   }
 };
 
-export const logout = () => {
+export const logout = async () => {
   Cookies.remove(TOKEN_KEY);
   if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     window.dispatchEvent(new Event(AUTH_UPDATED_EVENT));
+
+    try {
+      resetRecaptcha("recaptcha-container");
+    } catch {
+      // Ignore cleanup error
+    }
+
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } catch {
+      // Ignore signOut error
+    }
   }
 };
 

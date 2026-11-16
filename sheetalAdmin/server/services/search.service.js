@@ -182,21 +182,25 @@ const findMatchingCategories = async (normQ) => {
       if (variants.some((v) => v === normCat)) {
         isMatch = true;
       } else if (
-        categoryWords.some((word) => isCategoryTermMatch(term, word, variants))
+        categoryWords.some((word) => isCategoryTermMatch(term, word, variants, false))
       ) {
         isMatch = true;
       } else if (term.length >= 4 && isCategoryTypoMatch(term, normCat)) {
         isMatch = true;
       }
 
-      // Check subcategories
+      // Check subcategories - for queries length <= 2, require exact match only.
+      // Do not allow broad prefix matching on secondary subcategories for 1-2 character queries.
       if (Array.isArray(cat.subCategories)) {
         for (const sub of cat.subCategories) {
           const normSub = normaliseSearchText(sub);
           const subWords = normSub.split(" ").filter(Boolean);
           if (
             variants.some((v) => v === normSub) ||
-            subWords.some((word) => isCategoryTermMatch(term, word, variants)) ||
+            (term.length >= 3 &&
+              subWords.some((word) =>
+                isCategoryTermMatch(term, word, variants, true),
+              )) ||
             (term.length >= 4 && isCategoryTypoMatch(term, normSub))
           ) {
             isMatch = true;
@@ -218,7 +222,12 @@ const findMatchingCategories = async (normQ) => {
   return matches;
 };
 
-const isCategoryTermMatch = (term, categoryWord, variants) => {
+const isCategoryTermMatch = (
+  term,
+  categoryWord,
+  variants,
+  isSubCategory = false,
+) => {
   if (!term || !categoryWord) return false;
 
   // Prevent false collision between "suit(s)" and "set(s)"
@@ -240,6 +249,19 @@ const isCategoryTermMatch = (term, categoryWord, variants) => {
     categoryWord,
     ...buildWordVariants(categoryWord),
   ]);
+
+  // For very short queries (1-2 chars), subcategories must not broad-match,
+  // and category words must match exact or start with term
+  if (term.length <= 2) {
+    if (isSubCategory) {
+      return termVariants.has(categoryWord);
+    }
+    for (const candidate of candidateWords) {
+      if (termVariants.has(candidate)) return true;
+      if (candidate.startsWith(term)) return true;
+    }
+    return false;
+  }
 
   const maxSubsequenceSkips =
     term.length >= 5 &&

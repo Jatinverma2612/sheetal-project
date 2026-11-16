@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import useSettings from "@/hooks/useSettings";
 
 export default function Sidebar({ storeName = "Admin", isOpen, setIsOpen }) {
@@ -205,12 +205,23 @@ export default function Sidebar({ storeName = "Admin", isOpen, setIsOpen }) {
 }
 
 function NavItem({ item, pathname, setIsOpen }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const Icon = item.icon;
 
   const isActive =
     pathname === item.href ||
     (item.href !== "/admin" && pathname.startsWith(item.href));
+
+  const isParentActive = item.children?.some(
+    (child) => pathname === child.href || pathname.startsWith(child.href),
+  ) ?? false;
+
+  const [isExpanded, setIsExpanded] = useState(isParentActive);
+
+  useEffect(() => {
+    if (isParentActive) {
+      setIsExpanded(true);
+    }
+  }, [isParentActive]);
 
   if (!item.children) {
     return (
@@ -236,9 +247,14 @@ function NavItem({ item, pathname, setIsOpen }) {
     );
   }
 
-  const isParentActive = item.children.some(
-    (child) => pathname === child.href || pathname.startsWith(child.href),
-  );
+  const handleParentClick = (e) => {
+    if (item.href === "#") {
+      e.preventDefault();
+      setIsExpanded((prev) => !prev);
+    } else {
+      setIsOpen(false);
+    }
+  };
 
   const handleChevronClick = (e) => {
     e.preventDefault();
@@ -250,7 +266,7 @@ function NavItem({ item, pathname, setIsOpen }) {
     <div>
       <Link
         href={item.href}
-        onClick={() => setIsOpen(false)}
+        onClick={handleParentClick}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 group ${
           isParentActive
             ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"

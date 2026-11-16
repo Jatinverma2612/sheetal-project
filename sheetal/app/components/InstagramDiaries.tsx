@@ -208,14 +208,14 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
             <button
               onClick={scrollPrev}
               aria-label="Previous product"
-              className="absolute left-[-50px] cursor-pointer bottom-[20%] -translate-y-1/2 w-12 h-12 flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
+              className="absolute left-[-20px] md:left-[-50px] cursor-pointer bottom-[20%] -translate-y-1/2 w-12 h-12 hidden md:flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
             >
               <Image src="/assets/left-image.png" alt="Previous" width={48} height={48} className="w-full h-auto" />
             </button>
             <button
               onClick={scrollNext}
               aria-label="Next product"
-              className="absolute right-[-50px] cursor-pointer bottom-[20%] -translate-y-1/2 w-12 h-12 flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
+              className="absolute right-[-20px] md:right-[-50px] cursor-pointer bottom-[20%] -translate-y-1/2 w-12 h-12 hidden md:flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 z-10"
             >
               <Image src="/assets/right-image.png" alt="Next" width={48} height={48} className="w-full h-auto" />
             </button>

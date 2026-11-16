@@ -44,6 +44,23 @@ import useSWR from "swr";
 import { getSettings, getEnquiryImageUrl } from "../../services/settingsService";
 import { canonicalizeSizeName } from "../../utils/sizeUtils";
 
+const DEFAULT_FALLBACK_SIZE_CHART: SizeChartData = {
+  _id: "default-fallback-size-chart",
+  name: "Standard Size Chart",
+  headers: ["Size", "Bust", "Waist", "Hip", "Length"],
+  table: [
+    { cells: ["XS", "32", "26", "36", "44"] },
+    { cells: ["S", "34", "28", "38", "44"] },
+    { cells: ["M", "36", "30", "40", "45"] },
+    { cells: ["L", "38", "32", "42", "45"] },
+    { cells: ["XL", "40", "34", "44", "46"] },
+    { cells: ["XXL", "42", "36", "46", "46"] },
+    { cells: ["3XL", "44", "38", "48", "46"] },
+  ],
+  howToMeasureImage: "/assets/Apparel-Illustration.svg",
+  unit: "in",
+};
+
 const getStockLimitMessage = (count: number) =>
   `This item only has ${count} left.`;
 
@@ -175,11 +192,11 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
       const res = await fetchProductBySlug(slug);
       if (res.success && res.data) {
         setProduct(res.data);
-        setSizeChartData(
+        const resolvedChart =
           (res.data.sizeChart as SizeChartData | null) ||
-            (res.data.category?.sizeChart as SizeChartData | null) ||
-            null,
-        );
+          (res.data.category?.sizeChart as SizeChartData | null) ||
+          null;
+        setSizeChartData(resolvedChart || DEFAULT_FALLBACK_SIZE_CHART);
 
         const currentSelectedColor = selectedColorRef.current;
         const currentSelectedSize = selectedSizeRef.current;

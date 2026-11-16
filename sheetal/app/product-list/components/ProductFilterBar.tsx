@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import Image from "next/image";
 import { FilterOptions } from "../../hooks/useProductFilters";
 import { PriceRangeSlider } from "./PriceRangeSlider";
@@ -28,6 +28,90 @@ const toSentenceCase = (text: string): string => {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 };
 
+const AccordionChevron = React.memo(({ isOpen }: { isOpen: boolean }) => (
+  <svg
+    className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+));
+AccordionChevron.displayName = "AccordionChevron";
+
+const CheckboxRow = React.memo(({
+  id,
+  checked,
+  onChange,
+  label,
+  count,
+  colorCode,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  count?: number;
+  colorCode?: string;
+}) => (
+  <div className="flex items-center gap-3 group cursor-pointer">
+    <input
+      type="checkbox"
+      id={id}
+      checked={checked}
+      onChange={onChange}
+      className="w-4 h-4 accent-[#bd9951] border-gray-300 rounded cursor-pointer"
+    />
+    <label
+      htmlFor={id}
+      className="text-sm cursor-pointer flex items-center gap-2 group-hover:text-black transition-colors font-[family-name:var(--font-montserrat)]"
+    >
+      {colorCode && (
+        <span
+          className="w-4 h-4 rounded-full border border-gray-200 shadow-sm"
+          style={{ backgroundColor: colorCode }}
+        />
+      )}
+      {label}
+      {count !== undefined && <span className="text-gray-400">({count})</span>}
+    </label>
+  </div>
+));
+CheckboxRow.displayName = "CheckboxRow";
+
+const FilterSection = React.memo(({
+  id,
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  id: string;
+  title: string;
+  isOpen: boolean;
+  onToggle: (id: string) => void;
+  children: React.ReactNode;
+}) => (
+  <div className="border-b border-gray-300 pb-2 last:border-0">
+    <button
+      onClick={() => onToggle(id)}
+      className="w-full cursor-pointer flex justify-between items-center font-[family-name:var(--font-optima)] font-medium text-base transition-colors text-[15px]"
+    >
+      {title}
+      <AccordionChevron isOpen={isOpen} />
+    </button>
+    <div
+      className={`space-y-2 pt-2 transition-all duration-300 overflow-hidden ${
+        isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+      }`}
+    >
+      {children}
+    </div>
+  </div>
+));
+FilterSection.displayName = "FilterSection";
+
 const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
   filtersOpen,
   toggleFilters,
@@ -47,6 +131,20 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 }) => {
   const [openSections, setOpenSections] = useState<string[]>([]);
   const sortByRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef<number>(0);
+
+  const handleSidebarScroll = () => {
+    if (sidebarRef.current) {
+      scrollPosRef.current = sidebarRef.current.scrollTop;
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (sidebarRef.current && scrollPosRef.current > 0) {
+      sidebarRef.current.scrollTop = scrollPosRef.current;
+    }
+  });
 
   const isFilterSelected = (type: string, value: string) =>
     activeFilters.some((filter) => filter.type === type && filter.value === value);
@@ -96,83 +194,6 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
     (filterOptions.categories?.length <= 1 ||
       activeFilters.some((f) => f.type === "category")) &&
     filterOptions.subCategories.length > 0;
-
-  const AccordionChevron = ({ section }: { section: string }) => (
-    <svg
-      className={`w-4 h-4 transition-transform duration-200 ${openSections.includes(section) ? "rotate-180" : ""}`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-
-  const CheckboxRow = ({
-    id,
-    checked,
-    onChange,
-    label,
-    count,
-    colorCode,
-  }: {
-    id: string;
-    checked: boolean;
-    onChange: () => void;
-    label: string;
-    count?: number;
-    colorCode?: string;
-  }) => (
-    <div className="flex items-center gap-3 group cursor-pointer">
-      <input
-        type="checkbox"
-        id={id}
-        checked={checked}
-        onChange={onChange}
-        className="w-4 h-4 accent-[#bd9951] border-gray-300 rounded cursor-pointer"
-      />
-      <label
-        htmlFor={id}
-        className="text-sm cursor-pointer flex items-center gap-2 group-hover:text-black transition-colors font-[family-name:var(--font-montserrat)]"
-      >
-        {colorCode && (
-          <span
-            className="w-4 h-4 rounded-full border border-gray-200 shadow-sm"
-            style={{ backgroundColor: colorCode }}
-          />
-        )}
-        {label}
-        {count !== undefined && <span className="text-gray-400">({count})</span>}
-      </label>
-    </div>
-  );
-
-  const FilterSection = ({
-    id,
-    title,
-    children,
-  }: {
-    id: string;
-    title: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="border-b border-gray-300 pb-2 last:border-0">
-      <button
-        onClick={() => toggleSection(id)}
-        className="w-full cursor-pointer flex justify-between items-center font-[family-name:var(--font-optima)] font-medium text-base transition-colors text-[15px]"
-      >
-        {title}
-        <AccordionChevron section={id} />
-      </button>
-      <div
-        className={`space-y-2 pt-2 transition-all duration-300 overflow-hidden ${
-          openSections.includes(id) ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <>
@@ -272,6 +293,8 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
       {/* Sidebar Panel */}
       <div
+        ref={sidebarRef}
+        onScroll={handleSidebarScroll}
         className={`fixed top-0 left-0 h-full w-full md:w-[300px] bg-white z-[9999] shadow-2xl transform transition-transform duration-300 overflow-y-auto ${
           filtersOpen ? "translate-x-0" : "-translate-x-full"
         }
@@ -315,7 +338,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Category */}
             {filterOptions.categories?.length > 1 && (
-              <FilterSection id="category" title="Category">
+              <FilterSection
+                id="category"
+                title="Category"
+                isOpen={openSections.includes("category")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.categories.map((item, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -331,7 +359,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Sub Category — shown when ≥1 category selected; merges all their subcategories */}
             {showSubCategory && (
-              <FilterSection id="subCategory" title="Sub Category">
+              <FilterSection
+                id="subCategory"
+                title="Sub Category"
+                isOpen={openSections.includes("subCategory")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.subCategories.map((item, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -347,7 +380,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Size */}
             {filterOptions.sizes.length > 0 && (
-              <FilterSection id="size" title="Size">
+              <FilterSection
+                id="size"
+                title="Size"
+                isOpen={openSections.includes("size")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.sizes.map((size, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -362,7 +400,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Color */}
             {filterOptions.colors.length > 0 && (
-              <FilterSection id="color" title="Color">
+              <FilterSection
+                id="color"
+                title="Color"
+                isOpen={openSections.includes("color")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.colors.map((color, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -385,7 +428,7 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
                   className="w-full cursor-pointer flex justify-between items-center font-[family-name:var(--font-optima)] font-medium text-base transition-colors text-[15px]"
                 >
                   Price
-                  <AccordionChevron section="price" />
+                  <AccordionChevron isOpen={openSections.includes("price")} />
                 </button>
                 <div
                   className={`transition-all duration-300 overflow-hidden ${
@@ -411,7 +454,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Availability */}
             {filterOptions.availability.length > 0 && (
-              <FilterSection id="availability" title="Availability">
+              <FilterSection
+                id="availability"
+                title="Availability"
+                isOpen={openSections.includes("availability")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.availability.map((avail, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -427,7 +475,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Wear Type */}
             {filterOptions.wearTypes.length > 0 && (
-              <FilterSection id="wearType" title="Wear Type">
+              <FilterSection
+                id="wearType"
+                title="Wear Type"
+                isOpen={openSections.includes("wearType")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.wearTypes.map((wearType, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -443,7 +496,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Occasion */}
             {filterOptions.occasions.length > 0 && (
-              <FilterSection id="occasion" title="Occasion">
+              <FilterSection
+                id="occasion"
+                title="Occasion"
+                isOpen={openSections.includes("occasion")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.occasions.map((occasion, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -459,7 +517,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Tags */}
             {filterOptions.tags.length > 0 && (
-              <FilterSection id="tags" title="Tags">
+              <FilterSection
+                id="tags"
+                title="Tags"
+                isOpen={openSections.includes("tags")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.tags.map((tag, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -475,7 +538,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Style */}
             {filterOptions.styles.length > 0 && (
-              <FilterSection id="style" title="Style">
+              <FilterSection
+                id="style"
+                title="Style"
+                isOpen={openSections.includes("style")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.styles.map((item, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -491,7 +559,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Work */}
             {filterOptions.works.length > 0 && (
-              <FilterSection id="work" title="Work">
+              <FilterSection
+                id="work"
+                title="Work"
+                isOpen={openSections.includes("work")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.works.map((item, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -507,7 +580,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Fabric */}
             {filterOptions.fabrics.length > 0 && (
-              <FilterSection id="fabric" title="Fabric">
+              <FilterSection
+                id="fabric"
+                title="Fabric"
+                isOpen={openSections.includes("fabric")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.fabrics.map((item, idx) => (
                   <CheckboxRow
                     key={idx}
@@ -523,7 +601,12 @@ const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
 
             {/* Product Type */}
             {filterOptions.productTypes.length > 0 && (
-              <FilterSection id="productType" title="Product Type">
+              <FilterSection
+                id="productType"
+                title="Product Type"
+                isOpen={openSections.includes("productType")}
+                onToggle={toggleSection}
+              >
                 {filterOptions.productTypes.map((item, idx) => (
                   <CheckboxRow
                     key={idx}

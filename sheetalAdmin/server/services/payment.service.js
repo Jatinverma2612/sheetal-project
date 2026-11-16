@@ -214,10 +214,15 @@ export const createPaymentLinkService = async (
     platformFee = settings.platformFee || 0;
 
     // Shipping Logic check
-    const freeShippingThreshold = settings.freeShippingThreshold || 0;
-    const baseShippingFee = settings.shippingFee || 0;
+    const freeShippingThreshold = Number(settings.freeShippingThreshold) || 0;
+    const baseShippingFee = Number(settings.shippingFee) || 0;
+    const isFreeShippingCoupon = couponData?.offerType === "FreeShipping";
 
-    if (totalPrice > freeShippingThreshold && freeShippingThreshold > 0) {
+    if (
+      isFreeShippingCoupon ||
+      baseShippingFee === 0 ||
+      (freeShippingThreshold > 0 && totalPrice >= freeShippingThreshold)
+    ) {
       shippingPrice = 0;
     } else {
       shippingPrice = baseShippingFee;

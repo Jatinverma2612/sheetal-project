@@ -178,7 +178,7 @@ const HomeBannerCarousel = ({ banners }: { banners: BannerItem[] }) => {
   }, [mobileTransitionEnabled]);
 
   return (
-    <div className="relative w-full p-0 home-banner">
+    <div className="relative w-full max-w-full overflow-hidden p-0 home-banner">
       <div className="relative hidden md:block">
         <div className="relative overflow-hidden">
           <div
@@ -241,7 +241,7 @@ const HomeBannerCarousel = ({ banners }: { banners: BannerItem[] }) => {
         </div>
       </div>
 
-      <div className="relative block md:hidden">
+      <div className="relative block md:hidden w-full max-w-full overflow-hidden">
         <div className="relative overflow-hidden">
           <div
             className={`flex ease-out ${mobileTransitionEnabled ? "transition-transform duration-700" : ""}`}
