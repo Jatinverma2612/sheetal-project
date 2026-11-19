@@ -391,13 +391,14 @@ export const createOrderService = async (data, requester) => {
   }
 
   // 1. Parallel pre-checks and data fetching
-  const [user, abandonedCartCouponRecordId] = await Promise.all([
+  const [user, abandonedCartCouponRecordId, existingCart] = await Promise.all([
     User.findById(userId).lean(),
     !isBuyNow
       ? Cart.findOne({ user: userId })
           .lean()
           .then((cart) => cart?.appliedAbandonedCoupon?.couponRecordId ?? null)
       : Promise.resolve(null),
+    !isBuyNow ? Cart.findOne({ user: userId }).lean() : Promise.resolve(null),
   ]);
 
   if (!user) throw ErrorResponse("User not found", 404);
@@ -406,6 +407,13 @@ export const createOrderService = async (data, requester) => {
 
   // 2. Stock check and update
   await applyOrderInventoryAdjustments(orderItems);
+
+  const wasCartAbandoned = existingCart?.abandonmentStatus === "abandoned";
+  const finalRecoverySource = recoverySource || (wasCartAbandoned ? "organic" : null);
+  const finalRecoveryStage = recoveryStage ? Number(recoveryStage) : (wasCartAbandoned ? 1 : null);
+  const finalRecoveryCartId = recoveryCartId || (wasCartAbandoned ? String(existingCart._id) : null);
+  const finalRecoveryCycleId = recoveryCycleId || (wasCartAbandoned ? existingCart.abandonmentCycleId : null);
+  const finalRecoveredAt = finalRecoverySource ? new Date() : null;
 
   // 3. Build order document
   const finalOrderData = {
@@ -428,11 +436,11 @@ export const createOrderService = async (data, requester) => {
     taxPrice: data.taxPrice || 0,
     shippingPrice: data.shippingPrice || 0,
     totalPrice: data.totalPrice || 0,
-    recoverySource,
-    recoveryStage: recoveryStage ? Number(recoveryStage) : null,
-    recoveryCartId: recoveryCartId || null,
-    recoveryCycleId: recoveryCycleId || null,
-    recoveredAt: recoverySource ? new Date() : null,
+    recoverySource: finalRecoverySource,
+    recoveryStage: finalRecoveryStage,
+    recoveryCartId: finalRecoveryCartId,
+    recoveryCycleId: finalRecoveryCycleId,
+    recoveredAt: finalRecoveredAt,
     purchaseSource: isBuyNow ? "buyNow" : "cart",
     inventoryAdjusted: true,
     orderStatus: "Processing",
@@ -506,7 +514,7 @@ export const createOrderService = async (data, requester) => {
       }
 
       // 5d. Abandoned Cart Flow Completion
-      await completeAbandonedCartFlow({ userId }).catch((err) =>
+      await completeAbandonedCartFlow({ userId, order }).catch((err) =>
         console.error("[Background] Abandoned Cart Flow Error:", err.message),
       );
 

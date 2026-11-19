@@ -1031,6 +1031,7 @@ export const handleCheckoutExit = async ({
 export const completeAbandonedCartFlow = async ({
   userId = null,
   cartId = null,
+  order = null,
 } = {}) => {
   const filter = cartId ? { _id: cartId } : { user: userId };
   const cart = await Cart.findOne(filter);
@@ -1047,7 +1048,7 @@ export const completeAbandonedCartFlow = async ({
   const now = new Date();
   cart.abandonmentStatus = "completed";
   cart.completedAt = now;
-  cart.abandonedAt = null;
+  // Keep abandonedAt intact for historical tracking
   cart.checkoutExitedAt = null;
   cart.abandonmentReason = "order_completed";
   cart.abandonmentCycleId = null;
@@ -1055,17 +1056,40 @@ export const completeAbandonedCartFlow = async ({
   cart.abandonmentActiveLease = null;
   cart.abandonmentReminderAttempts = sanitizeReminderAttempts(cart);
   cart.cartTrackingId = null;
+
+  if (order) {
+    cart.lastRecoveredOrder = order._id;
+    cart.recoveredAmount = Number(order.totalPrice || 0);
+    cart.recoveredItems = (order.orderItems || []).map((item) => ({
+      product: item.product?._id || item.product,
+      name: item.name || "Product",
+      slug: item.slug || "",
+      quantity: item.quantity || 1,
+      size: item.size || item.variant?.size || null,
+      color: item.color || item.variant?.color || null,
+      variantImage: item.image || item.variantImage || null,
+      price: item.price || 0,
+      discountPrice: item.discountPrice || item.price || 0,
+    }));
+  } else if (Array.isArray(cart.items) && cart.items.length > 0) {
+    cart.recoveredItems = cart.items.map((item) => ({
+      product: item.product?._id || item.product,
+      name: item.product?.name || item.name || "Product",
+      slug: item.product?.slug || item.slug || "",
+      quantity: item.quantity || 1,
+      size: item.size || null,
+      color: item.color || null,
+      variantImage: item.variantImage || null,
+      price: item.price || 0,
+      discountPrice: item.discountPrice || item.price || 0,
+    }));
+    cart.recoveredAmount = cart.items.reduce((sum, item) => {
+      const price = item.discountPrice > 0 ? item.discountPrice : item.price;
+      return sum + price * (item.quantity || 1);
+    }, 0);
+  }
+
   await cart.save();
-
-  logger.info(
-    {
-      cartId: cart._id.toString(),
-      cartTrackingId: cart.cartTrackingId || null,
-      userId: cart.user?.toString?.() || userId?.toString?.() || null,
-    },
-    "[AbandonedCart] Flow completed and reminders cancelled",
-  );
-
   return cart;
 };
 

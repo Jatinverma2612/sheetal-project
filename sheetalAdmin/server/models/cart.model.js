@@ -88,6 +88,19 @@ const cartSchema = new mongoose.Schema(
     abandonedAt: { type: Date, default: null },
     checkoutExitedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+    lastRecoveredOrder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+    },
+    recoveredAmount: {
+      type: Number,
+      default: 0,
+    },
+    recoveredItems: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
     abandonmentReason: {
       type: String,
       enum: ["inactivity", "checkout_exit", "order_completed"],

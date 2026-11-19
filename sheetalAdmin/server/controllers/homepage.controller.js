@@ -38,6 +38,41 @@ const initializeHomepageIfEmpty = async (homepage) => {
     updated = true;
   }
 
+  // Initialize Instagram Diaries products with active in-stock products if not yet configured by admin
+  if (
+    !homepage.instagramDiaries?.isConfigured &&
+    (!Array.isArray(homepage.instagramDiaries?.products) ||
+      homepage.instagramDiaries.products.length === 0)
+  ) {
+    const candidateProducts = await Product.find({ status: "Active" })
+      .sort({ createdAt: -1 })
+      .limit(15);
+    const validProducts = candidateProducts
+      .filter((p) => {
+        if (!p || p.status !== "Active") return false;
+        const hasVariantSizes = p.variants?.some(
+          (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+        );
+        if (hasVariantSizes) {
+          const hasVariantStock = p.variants.some((v) =>
+            v.sizes?.some((s) => Number(s.stock || 0) > 0),
+          );
+          const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+          return hasVariantStock && hasOverallStock;
+        }
+        return (p.stock ?? 0) > 0;
+      })
+      .slice(0, 5);
+
+    if (validProducts.length > 0) {
+      homepage.instagramDiaries = {
+        ...(homepage.instagramDiaries?.toObject?.() || homepage.instagramDiaries),
+        products: validProducts.map((p) => p._id),
+      };
+      updated = true;
+    }
+  }
+
   // NOTE: Do not forcefully seed random products into collections, trendingThisWeek, or newArrivals!
   // Products in these sections must only be products the admin explicitly pushed via the
   // "Push for Collection", "Push for Trending", or "Push for New Arrivals" switches.
@@ -78,6 +113,10 @@ export const getSections = async (req, res, next) => {
       .populate({
         path: "newArrivals.products",
         select: "name slug mainImage hoverImage variants price stock status category averageRating isNewArrival sortOrder createdAt",
+      })
+      .populate({
+        path: "instagramDiaries.products",
+        select: "name slug mainImage hoverImage variants price stock status category averageRating sortOrder createdAt",
       });
 
     const isProductInStock = (p) => {
@@ -149,6 +188,38 @@ export const getSections = async (req, res, next) => {
       products: buildSectionProducts(collectionsObj.products, flaggedCollections),
     };
 
+    const instagramDiariesObj =
+      homepage.instagramDiaries?.toObject?.() ||
+      homepage.instagramDiaries ||
+      {};
+
+    const rawProductLinks = instagramDiariesObj.productLinks;
+    const productLinksMap =
+      rawProductLinks instanceof Map
+        ? Object.fromEntries(rawProductLinks)
+        : typeof rawProductLinks === "object" && rawProductLinks !== null
+          ? rawProductLinks
+          : {};
+
+    const filteredInstagramDiaries = {
+      ...instagramDiariesObj,
+      products: (Array.isArray(instagramDiariesObj.products)
+        ? instagramDiariesObj.products.filter(isAvailableProductForPublic)
+        : []
+      ).map((p) => {
+        const pObj = p?.toObject
+          ? p.toObject()
+          : typeof p === "object" && p !== null
+            ? { ...p }
+            : { _id: p };
+        const pid = pObj._id?.toString?.() || String(pObj._id || "");
+        return {
+          ...pObj,
+          instagramUrl: productLinksMap[pid] || "",
+        };
+      }),
+    };
+
     res.status(200).json({
       success: true,
       sections: homepage.sections,
@@ -163,7 +234,7 @@ export const getSections = async (req, res, next) => {
       collections: filteredCollections,
       trendingThisWeek: filteredTrending,
       newArrivals: filteredNewArrivals,
-      instagramDiaries: homepage.instagramDiaries,
+      instagramDiaries: filteredInstagramDiaries,
       testimonials: homepage.testimonials,
       blogs: homepage.blogs,
       metaTitle: homepage.metaTitle || "",
@@ -284,11 +355,29 @@ export const updateSections = async (req, res, next) => {
         }
         homepage.markModified("newArrivals");
       }
-      if (instagramDiaries)
+      if (instagramDiaries) {
         homepage.instagramDiaries = {
-          ...homepage.instagramDiaries,
+          ...(homepage.instagramDiaries?.toObject?.() || homepage.instagramDiaries),
           ...instagramDiaries,
+          isConfigured: true,
         };
+        if (Array.isArray(instagramDiaries.products)) {
+          homepage.instagramDiaries.products = instagramDiaries.products;
+        }
+        if (instagramDiaries.productLinks !== undefined) {
+          if (instagramDiaries.productLinks instanceof Map) {
+            homepage.instagramDiaries.productLinks = instagramDiaries.productLinks;
+          } else if (
+            typeof instagramDiaries.productLinks === "object" &&
+            instagramDiaries.productLinks !== null
+          ) {
+            homepage.instagramDiaries.productLinks = new Map(
+              Object.entries(instagramDiaries.productLinks),
+            );
+          }
+        }
+        homepage.markModified("instagramDiaries");
+      }
       if (testimonials)
         homepage.testimonials = { ...homepage.testimonials, ...testimonials };
       if (blogs)
@@ -349,7 +438,7 @@ export const getSectionContent = async (req, res, next) => {
         select: "name slug mainImage",
       });
     } else if (
-      ["trendingThisWeek", "newArrivals", "collections"].includes(sectionName)
+      ["trendingThisWeek", "newArrivals", "collections", "instagramDiaries"].includes(sectionName)
     ) {
       query = query.populate({
         path: `${sectionName}.products`,
@@ -361,7 +450,7 @@ export const getSectionContent = async (req, res, next) => {
 
     let sectionData = homepage[sectionName];
     if (
-      ["trendingThisWeek", "newArrivals", "collections"].includes(sectionName) &&
+      ["trendingThisWeek", "newArrivals", "collections", "instagramDiaries"].includes(sectionName) &&
       sectionData?.products
     ) {
       const isProductInStock = (p) => {
@@ -382,6 +471,30 @@ export const getSectionContent = async (req, res, next) => {
       rawObj.products = (rawObj.products || []).filter(
         (p) => p && p.status === "Active" && p.isActive !== false && isProductInStock(p)
       );
+
+      if (sectionName === "instagramDiaries") {
+        const rawProductLinks = rawObj.productLinks;
+        const productLinksMap =
+          rawProductLinks instanceof Map
+            ? Object.fromEntries(rawProductLinks)
+            : typeof rawProductLinks === "object" && rawProductLinks !== null
+              ? rawProductLinks
+              : {};
+
+        rawObj.products = rawObj.products.map((p) => {
+          const pObj = p?.toObject
+            ? p.toObject()
+            : typeof p === "object" && p !== null
+              ? { ...p }
+              : { _id: p };
+          const pid = pObj._id?.toString?.() || String(pObj._id || "");
+          return {
+            ...pObj,
+            instagramUrl: productLinksMap[pid] || "",
+          };
+        });
+      }
+
       sectionData = rawObj;
     }
 

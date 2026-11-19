@@ -88,6 +88,7 @@ const SECTION_CONFIG = {
       { key: "heading", label: "Heading", type: "text" },
       { key: "subheading", label: "Subheading", type: "text" },
     ],
+    hasProducts: true,
   },
 };
 
@@ -104,7 +105,14 @@ const resolveImageUrl = (item) => {
   return `${IMAGE_BASE_URL}/${cleanPath}`;
 };
 
-function SortableItem({ id, index, item, onRemove }) {
+function SortableItem({
+  id,
+  index,
+  item,
+  onRemove,
+  isInstagramDiaries = false,
+  onLinkChange,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id });
 
@@ -119,42 +127,60 @@ function SortableItem({ id, index, item, onRemove }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm group hover:border-slate-300 transition-all"
+      className="flex flex-col sm:flex-row sm:items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm group hover:border-slate-300 transition-all"
     >
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab text-slate-400 hover:text-slate-600 p-1"
-        title="Drag to reorder"
-      >
-        <GripVertical size={18} />
+      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab text-slate-400 hover:text-slate-600 p-1 shrink-0"
+          title="Drag to reorder"
+        >
+          <GripVertical size={18} />
+        </div>
+        <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">
+          {index + 1}
+        </div>
+        <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+          <img
+            src={imageUrl}
+            alt={item.name || item.title || ""}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">
+            {item.name || item.title}
+          </p>
+          <p className="text-xs text-slate-400 truncate">
+            /{item.slug || ""}
+          </p>
+        </div>
       </div>
-      <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">
-        {index + 1}
+
+      {isInstagramDiaries && (
+        <div className="w-full sm:w-80 shrink-0 pl-10 sm:pl-0">
+          <input
+            type="url"
+            placeholder="Instagram post link (https://...)"
+            value={item.instagramUrl || ""}
+            onChange={(e) => onLinkChange?.(id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400 font-mono"
+          />
+        </div>
+      )}
+
+      <div className="flex justify-end sm:justify-start">
+        <button
+          type="button"
+          onClick={() => onRemove(id)}
+          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+          title="Remove from section"
+        >
+          <X size={18} />
+        </button>
       </div>
-      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-        <img
-          src={imageUrl}
-          alt={item.name || item.title || ""}
-          className="w-full h-full object-cover"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-slate-900 truncate">
-          {item.name || item.title}
-        </p>
-        <p className="text-xs text-slate-400 truncate">
-          /{item.slug || ""}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onRemove(id)}
-        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-        title="Remove from section"
-      >
-        <X size={18} />
-      </button>
     </div>
   );
 }
@@ -466,6 +492,14 @@ export default function EditSectionPage() {
     setItems((prev) => prev.filter((i) => i._id !== id));
   };
 
+  const handleItemLinkChange = (id, url) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item._id === id ? { ...item, instagramUrl: url } : item,
+      ),
+    );
+  };
+
   const handleSearch = useCallback(
     async (query) => {
       if (!query.trim()) {
@@ -525,6 +559,16 @@ export default function EditSectionPage() {
           [config.hasCategories ? "categories" : "products"]: items.map(
             (i) => i._id,
           ),
+          ...(section === "instagramDiaries"
+            ? {
+                productLinks: items.reduce((acc, i) => {
+                  if (i.instagramUrl && typeof i.instagramUrl === "string") {
+                    acc[i._id] = i.instagramUrl.trim();
+                  }
+                  return acc;
+                }, {}),
+              }
+            : {}),
         },
       };
 
@@ -734,6 +778,8 @@ export default function EditSectionPage() {
                       index={idx}
                       item={item}
                       onRemove={handleRemoveItem}
+                      isInstagramDiaries={section === "instagramDiaries"}
+                      onLinkChange={handleItemLinkChange}
                     />
                   ))}
                 </div>

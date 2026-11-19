@@ -98,10 +98,12 @@ export default function AbandonedCartsPage() {
       const data = res.data || [];
       setAllCarts(data);
 
-      const totalValue = data.reduce(
-        (sum, cart) => sum + Number(cart.cartValue || 0),
-        0,
-      );
+      const totalValue =
+        res.totalAbandonedValue !== undefined
+          ? Number(res.totalAbandonedValue)
+          : data
+              .filter((cart) => cart.status === "abandoned")
+              .reduce((sum, cart) => sum + Number(cart.cartValue || 0), 0);
 
       setStats({
         total: Number(res.abandonedCount || 0),
@@ -534,10 +536,10 @@ function CartRow({ cart, index, onOpen }) {
           style={{
             fontSize: 13,
             fontWeight: 800,
-            color: "#e11d48",
+            color: cart.status === "recovered" ? "#059669" : "#e11d48",
             fontFamily: "monospace",
-            background: "#fff1f2",
-            border: "1px solid #ffe4e6",
+            background: cart.status === "recovered" ? "#ecfdf5" : "#fff1f2",
+            border: `1px solid ${cart.status === "recovered" ? "#d1fae5" : "#ffe4e6"}`,
             borderRadius: 7,
             padding: "3px 9px",
             whiteSpace: "nowrap",

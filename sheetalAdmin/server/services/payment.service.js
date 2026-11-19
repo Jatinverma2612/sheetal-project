@@ -235,6 +235,13 @@ export const createPaymentLinkService = async (
 
   await validateInventoryForOrderItems(orderItems);
 
+  const existingCart = !isBuyNow ? await Cart.findOne({ user: userId }).lean() : null;
+  const wasCartAbandoned = existingCart?.abandonmentStatus === "abandoned";
+  const finalRecoverySource = recoveryData.recoverySource || (wasCartAbandoned ? "organic" : null);
+  const finalRecoveryStage = recoveryData.recoveryStage ? Number(recoveryData.recoveryStage) : (wasCartAbandoned ? 1 : null);
+  const finalRecoveryCartId = recoveryData.recoveryCartId || (wasCartAbandoned ? String(existingCart._id) : null);
+  const finalRecoveryCycleId = recoveryData.recoveryCycleId || (wasCartAbandoned ? existingCart.abandonmentCycleId : null);
+
   // 3. Create Order in Database (Pending Payment)
   const order = await Order.create({
     user: userId,
@@ -254,12 +261,10 @@ export const createPaymentLinkService = async (
     shippingPrice: shippingPrice,
     taxPrice: platformFee, // Using taxPrice field for platformFee if no specific field exists, or add to schema
     totalPrice: finalAmount,
-    recoverySource: recoveryData.recoverySource || null,
-    recoveryStage: recoveryData.recoveryStage
-      ? Number(recoveryData.recoveryStage)
-      : null,
-    recoveryCartId: recoveryData.recoveryCartId || null,
-    recoveryCycleId: recoveryData.recoveryCycleId || null,
+    recoverySource: finalRecoverySource,
+    recoveryStage: finalRecoveryStage,
+    recoveryCartId: finalRecoveryCartId,
+    recoveryCycleId: finalRecoveryCycleId,
     recoveredAt: null,
     orderStatus: "Processing",
     purchaseSource: isBuyNow ? "buyNow" : "cart",
@@ -491,7 +496,7 @@ export const verifyOnlinePaymentService = async (params) => {
       }
 
       // 8d. Complete abandoned cart flow
-      await completeAbandonedCartFlow({ userId: order.user }).catch((err) =>
+      await completeAbandonedCartFlow({ userId: order.user, order }).catch((err) =>
         console.error("[Background] Abandoned Cart Error:", err.message),
       );
 

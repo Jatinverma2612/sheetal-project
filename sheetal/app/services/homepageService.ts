@@ -59,6 +59,8 @@ export interface NewArrivalsContent {
 export interface InstagramDiariesContent {
   heading: string;
   subheading: string;
+  products?: any[];
+  productLinks?: Record<string, string>;
 }
 
 export interface TestimonialsContent {

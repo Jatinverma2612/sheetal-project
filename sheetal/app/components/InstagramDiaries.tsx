@@ -69,6 +69,61 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
   }, [cards]);
 
   useEffect(() => {
+    // If curated products are provided from CMS, use them directly
+    if (
+      content?.products &&
+      Array.isArray(content.products) &&
+      content.products.length > 0
+    ) {
+      const inStockProducts = content.products.filter((p: Product) => {
+        if (!p || p.status !== "Active") return false;
+        const hasVariantSizes = p.variants?.some(
+          (v) => Array.isArray(v.sizes) && v.sizes.length > 0,
+        );
+        if (hasVariantSizes) {
+          const hasVariantStock = p.variants.some((v) =>
+            v.sizes?.some((s) => Number(s.stock || 0) > 0),
+          );
+          const hasOverallStock = p.stock === undefined || Number(p.stock) > 0;
+          return hasVariantStock && hasOverallStock;
+        }
+        return (p.stock ?? 0) > 0;
+      });
+
+      if (inStockProducts.length > 0) {
+        setCards(
+          inStockProducts.map((product: Product) => {
+            const rawUrl =
+              (product as any).instagramUrl ||
+              content?.productLinks?.[product._id] ||
+              "";
+            const trimmed = typeof rawUrl === "string" ? rawUrl.trim() : "";
+            const link = trimmed
+              ? trimmed.startsWith("http://") || trimmed.startsWith("https://")
+                ? trimmed
+                : `https://${trimmed}`
+              : INSTAGRAM_URL;
+
+            return {
+              url: getProductImageUrl(product),
+              link,
+              alt: product.mainImage?.alt || product.name,
+            };
+          }),
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (content !== undefined) {
+      // Content was provided from CMS: honor the admin configuration
+      // If 0 products are chosen in Admin, do not display random fallback products
+      setCards([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchLatestProducts = async () => {
       try {
         const response = await fetchProducts({
@@ -113,7 +168,7 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
       }
     };
     fetchLatestProducts();
-  }, []);
+  }, [content?.products]);
 
   const SkeletonCard = ({ index }: { index: number }) => (
     <div className="relative overflow-hidden rounded-xl shadow-md aspect-[3/4] bg-[#fbf9f6] border border-[#f0ece4] flex flex-col items-center justify-center p-6 animate-pulse">
@@ -147,6 +202,8 @@ const InstagramDiaries = ({ content }: { content?: InstagramDiariesContent }) =>
       </div>
     </a>
   );
+
+  if (!loading && cards.length === 0) return null;
 
   return (
     <div className="relative w-full overflow-hidden bg-[#f9f9f9] px-4 py-8 sm:px-6 md:py-10 lg:px-20">

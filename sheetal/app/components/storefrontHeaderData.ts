@@ -85,6 +85,7 @@ export const defaultHomepageSettings: HomepageSettings = {
   instagramDiaries: {
     heading: "",
     subheading: "",
+    products: [],
   },
   testimonials: {
     heading: "",

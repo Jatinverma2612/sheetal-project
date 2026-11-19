@@ -96,6 +96,13 @@ const homepageSchema = new mongoose.Schema(
         default:
           "Follow our journey and stay updated with the latest trends and styles.",
       },
+      products: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+      productLinks: {
+        type: Map,
+        of: String,
+        default: {},
+      },
+      isConfigured: { type: Boolean, default: false },
     },
     testimonials: {
       heading: { type: String, default: "What Our Customers Say" },

@@ -92,12 +92,12 @@ const orderSchema = new mongoose.Schema(
     totalPrice: { type: Number, default: 0 },
     recoverySource: {
       type: String,
-      enum: ["email", "whatsapp", "sms"],
+      enum: ["email", "whatsapp", "sms", "organic", "direct", "web"],
       default: null,
     },
     recoveryStage: {
       type: Number,
-      min: 1,
+      min: 0,
       max: 4,
       default: null,
     },
