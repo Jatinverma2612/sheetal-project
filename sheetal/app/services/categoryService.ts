@@ -74,14 +74,19 @@ export const fetchCategoryBySlug = async (
   slug: string,
 ): Promise<Category | null> => {
   try {
-    const data: ApiResponse<Category> = await apiFetch(`/categories/${slug}`);
+    const encodedSlug = encodeURIComponent(
+      decodeURIComponent(slug || "").trim(),
+    );
+    if (!encodedSlug) return null;
+    const data: ApiResponse<Category> = await apiFetch(`/categories/${encodedSlug}`);
     return data.data || null;
   } catch (error) {
     console.error("Error fetching category by slug:", error);
     // Fallback if endpoint not implemented yet
     try {
       const all: Category[] = await fetchAllCategories();
-      return all.find((c) => c.slug === slug) || null;
+      const normalized = decodeURIComponent(slug || "").trim().toLowerCase();
+      return all.find((c) => c.slug?.toLowerCase() === normalized) || null;
     } catch {
       throw error;
     }
@@ -118,7 +123,11 @@ export const fetchCategoryBySlugServer = async (
   slug: string,
 ): Promise<Category | null> => {
   try {
-    const res = await apiFetch(`/categories/${slug}`, {
+    const encodedSlug = encodeURIComponent(
+      decodeURIComponent(slug || "").trim(),
+    );
+    if (!encodedSlug) return null;
+    const res = await apiFetch(`/categories/${encodedSlug}`, {
       cache: "no-store",
     });
     return res?.data ?? null;

@@ -40,17 +40,51 @@ const hasMobileImage = (banner: BannerItem): banner is BannerWithMobileImage =>
 
 const resolveBannerHref = (href?: string) => {
   const trimmedHref = href?.trim();
-  if (!trimmedHref) return "#";
+  if (!trimmedHref || trimmedHref === "#") return "#";
+
+  if (trimmedHref.startsWith("http://") || trimmedHref.startsWith("https://")) {
+    try {
+      return new URL(trimmedHref).toString();
+    } catch {
+      return "#";
+    }
+  }
 
   const legacyCategoryMatch = trimmedHref.match(
     /^\/product-list\?category=([^&#]+)$/i,
   );
-  if (!legacyCategoryMatch) {
-    return trimmedHref;
+  if (legacyCategoryMatch) {
+    const categorySlug = decodeURIComponent(legacyCategoryMatch[1] || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+    return categorySlug ? `/${encodeURIComponent(categorySlug)}` : "/product-list";
   }
 
-  const categorySlug = decodeURIComponent(legacyCategoryMatch[1] || "").trim();
-  return categorySlug ? `/${encodeURIComponent(categorySlug)}` : "/product-list";
+  const normalizedPath = trimmedHref.startsWith("/")
+    ? trimmedHref
+    : `/${trimmedHref}`;
+
+  try {
+    const [pathPart, ...queryParts] = normalizedPath.split("?");
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("?")}` : "";
+    const sanitizedSegments = pathPart
+      .split("/")
+      .map((segment) => {
+        if (!segment) return "";
+        const decoded = decodeURIComponent(segment)
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-");
+        return encodeURIComponent(decoded);
+      })
+      .join("/");
+
+    const finalPath = `${sanitizedSegments || "/"}${queryString}`;
+    return finalPath || "/product-list";
+  } catch {
+    return encodeURI(normalizedPath) || "/product-list";
+  }
 };
 
 const ArrowIcon = ({

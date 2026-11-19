@@ -32,7 +32,11 @@ export const fetchStaticPageBySlug = async (
   slug: string,
 ): Promise<StaticPage | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/pages/slug/${slug}`, {
+    const encodedSlug = encodeURIComponent(
+      decodeURIComponent(slug || "").trim(),
+    );
+    if (!encodedSlug) return null;
+    const response = await fetch(`${API_BASE_URL}/pages/slug/${encodedSlug}`, {
       cache: "no-store",
     });
     if (response.status === 404) return null;

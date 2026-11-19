@@ -120,7 +120,12 @@ export default function BannerModal({
           setLinkType("home");
         } else if (link.startsWith("/product-list?category=")) {
           setLinkType("category");
-          setSelectedCategorySlug(link.split("=")[1]);
+          setSelectedCategorySlug(
+            decodeURIComponent(link.split("=")[1] || "")
+              .trim()
+              .toLowerCase()
+              .replace(/\s+/g, "-"),
+          );
         } else if (
           link.startsWith("/") &&
           !link.startsWith("/product/") &&
@@ -129,7 +134,12 @@ export default function BannerModal({
           link !== "/blogs"
         ) {
           setLinkType("category");
-          setSelectedCategorySlug(link.split("/")[1] || "");
+          setSelectedCategorySlug(
+            decodeURIComponent(link.split("/")[1] || "")
+              .trim()
+              .toLowerCase()
+              .replace(/\s+/g, "-"),
+          );
         } else if (link.startsWith("/product/")) {
           setLinkType("product");
           setSelectedProductSlug(link.split("/")[2]);
@@ -231,18 +241,43 @@ export default function BannerModal({
       case "home":
         finalLink = "/";
         break;
-      case "category":
-        finalLink = `/${selectedCategorySlug}`;
+      case "category": {
+        const cleanCategorySlug = (selectedCategorySlug || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        finalLink = cleanCategorySlug ? `/${cleanCategorySlug}` : "/";
         break;
-      case "product":
-        finalLink = `/product/${selectedProductSlug}`;
+      }
+      case "product": {
+        const cleanProductSlug = (selectedProductSlug || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        finalLink = cleanProductSlug ? `/product/${cleanProductSlug}` : "/";
         break;
+      }
       case "static":
-        finalLink = staticPage;
+        finalLink = staticPage || "/";
         break;
-      case "custom":
-        finalLink = customLink;
+      case "custom": {
+        const cleanCustom = (customLink || "").trim();
+        if (
+          cleanCustom.startsWith("http://") ||
+          cleanCustom.startsWith("https://")
+        ) {
+          finalLink = cleanCustom;
+        } else if (cleanCustom) {
+          finalLink = cleanCustom.startsWith("/")
+            ? cleanCustom
+            : `/${cleanCustom}`;
+        } else {
+          finalLink = "/";
+        }
         break;
+      }
       default:
         finalLink = "/";
     }
