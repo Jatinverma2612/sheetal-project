@@ -18,6 +18,12 @@ const getAbandonedCartCouponCode = () =>
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+const getItemEffectivePrice = (item) => {
+  const p = Number(item?.price) || 0;
+  const dp = Number(item?.discountPrice) || 0;
+  return dp > 0 && dp < p ? dp : p;
+};
+
 /**
  * Distribute `totalDiscount` across `items` proportionally using each item's
  * effective line total. Uses floor-truncation per item and assigns the
@@ -33,7 +39,7 @@ const distributeDiscount = (items, applicableTotal, totalDiscount) => {
   let lastItemId = null;
 
   for (const item of items) {
-    const lineTotal = (item.discountPrice ?? item.price) * item.quantity;
+    const lineTotal = getItemEffectivePrice(item) * item.quantity;
     const share = Math.floor((lineTotal / applicableTotal) * totalDiscount);
     itemWiseDiscount[item._id] = share;
     assignedSum += share;
@@ -260,7 +266,7 @@ export const applyCouponService = async ({
           ),
       );
       applicableTotal = applicableItems.reduce(
-        (sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity,
+        (sum, item) => sum + getItemEffectivePrice(item) * item.quantity,
         0,
       );
     } else if (coupon.scope === "Specific_Product") {
@@ -273,7 +279,7 @@ export const applyCouponService = async ({
           ),
       );
       applicableTotal = applicableItems.reduce(
-        (sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity,
+        (sum, item) => sum + getItemEffectivePrice(item) * item.quantity,
         0,
       );
     }
@@ -345,7 +351,7 @@ export const applyCouponService = async ({
 
         // Give the cheapest unit(s) free.
         const sortedItems = [...bogoApplicableItems].sort(
-          (a, b) => (a.discountPrice ?? a.price) - (b.discountPrice ?? b.price),
+          (a, b) => getItemEffectivePrice(a) - getItemEffectivePrice(b),
         );
 
         let bogoDiscount = 0;
@@ -353,7 +359,7 @@ export const applyCouponService = async ({
 
         for (const item of sortedItems) {
           if (remainingFreeUnits <= 0) break;
-          const itemPrice = item.discountPrice ?? item.price;
+          const itemPrice = getItemEffectivePrice(item);
           const unitsToDiscount = Math.min(item.quantity, remainingFreeUnits);
           bogoDiscount += unitsToDiscount * itemPrice;
           remainingFreeUnits -= unitsToDiscount;
@@ -372,7 +378,7 @@ export const applyCouponService = async ({
           const bogoLines = [];
           for (const item of sortedItems) {
             if (remainingFreeUnits <= 0) break;
-            const itemPrice = item.discountPrice ?? item.price;
+            const itemPrice = getItemEffectivePrice(item);
             const unitsToDiscount = Math.min(item.quantity, remainingFreeUnits);
             const rawShare = unitsToDiscount * itemPrice * discountRatio;
             bogoLines.push({ id: item._id, rawShare });

@@ -166,11 +166,15 @@ const CartItemsList: React.FC<CartItemsListProps> = ({
         <div className="divide-y divide-gray-100">
           {cartItems.map((item) => {
             const availableStock = getItemAvailableStock(item);
-            const displayOriginalPrice = item.price ?? 0;
-            const displayDiscountPrice =
-              item.discountPrice ?? displayOriginalPrice;
+            const displayOriginalPrice = Number(item.price) || 0;
+            const hasValidDiscount =
+              Number(item.discountPrice) > 0 &&
+              Number(item.discountPrice) < displayOriginalPrice;
+            const displayDiscountPrice = hasValidDiscount
+              ? Number(item.discountPrice)
+              : displayOriginalPrice;
             const discountPercentage =
-              displayOriginalPrice > 0
+              hasValidDiscount && displayOriginalPrice > 0
                 ? Math.round(
                     ((displayOriginalPrice - displayDiscountPrice) /
                       displayOriginalPrice) *

@@ -788,7 +788,10 @@ export const useCart = (): UseCartReturn => {
 
     cart.forEach((item) => {
       const itemPrice = item.price ?? 0;
-      const itemDiscountPrice = item.discountPrice ?? itemPrice;
+      const itemDiscountPrice =
+        Number(item.discountPrice) > 0 && Number(item.discountPrice) < itemPrice
+          ? Number(item.discountPrice)
+          : itemPrice;
       newTotalMrp += itemPrice * item.quantity;
       newTotalDiscount += (itemPrice - itemDiscountPrice) * item.quantity;
     });
@@ -844,7 +847,10 @@ export const useCart = (): UseCartReturn => {
 
         cart.forEach((item) => {
           const itemPrice = item.price ?? 0;
-          const itemDiscountPrice = item.discountPrice ?? itemPrice;
+          const itemDiscountPrice =
+            Number(item.discountPrice) > 0 && Number(item.discountPrice) < itemPrice
+              ? Number(item.discountPrice)
+              : itemPrice;
           currentMrp += itemPrice * item.quantity;
           currentDiscount += (itemPrice - itemDiscountPrice) * item.quantity;
         });

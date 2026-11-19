@@ -79,10 +79,14 @@ const SharedCartPage = () => {
       (sum, item) => sum + (item.price ?? 0) * item.quantity,
       0,
     );
-    const discounted = items.reduce(
-      (sum, item) => sum + (item.discountPrice ?? item.price ?? 0) * item.quantity,
-      0,
-    );
+    const discounted = items.reduce((sum, item) => {
+      const price = Number(item.price) || 0;
+      const effectivePrice =
+        Number(item.discountPrice) > 0 && Number(item.discountPrice) < price
+          ? Number(item.discountPrice)
+          : price;
+      return sum + effectivePrice * item.quantity;
+    }, 0);
     return { mrp, discounted };
   }, [items]);
 
@@ -205,11 +209,15 @@ const SharedCartPage = () => {
 
               <div className="divide-y divide-gray-100">
                 {items.map((item) => {
-                  const displayOriginalPrice = item.price ?? 0;
-                  const displayDiscountPrice =
-                    item.discountPrice ?? displayOriginalPrice;
+                  const displayOriginalPrice = Number(item.price) || 0;
+                  const hasValidDiscount =
+                    Number(item.discountPrice) > 0 &&
+                    Number(item.discountPrice) < displayOriginalPrice;
+                  const displayDiscountPrice = hasValidDiscount
+                    ? Number(item.discountPrice)
+                    : displayOriginalPrice;
                   const discountPercentage =
-                    displayOriginalPrice > 0
+                    hasValidDiscount && displayOriginalPrice > 0
                       ? Math.round(
                           ((displayOriginalPrice - displayDiscountPrice) /
                             displayOriginalPrice) *

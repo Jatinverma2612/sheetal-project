@@ -215,6 +215,22 @@ export const getCartByUserIdService = async (userId) => {
     await tryRecalculateCoupon(cart);
   }
 
+  // Heal existing cart items that have discountPrice = 0 or invalid
+  let cartUpdated = false;
+  cart.items.forEach((item) => {
+    const p = Number(item.price) || 0;
+    const dp = Number(item.discountPrice) || 0;
+    if (dp <= 0 || dp >= p) {
+      if (item.discountPrice !== p) {
+        item.discountPrice = p;
+        cartUpdated = true;
+      }
+    }
+  });
+  if (cartUpdated) {
+    await cart.save();
+  }
+
   return { success: true, data: cart };
 };
 
@@ -230,6 +246,11 @@ export const addToCartService = async (
   variantId = null,
 ) => {
   const normalizedQuantity = normalizeQuantity(quantity);
+  const resolvedDiscountPrice =
+    Number(discountPrice) > 0 && Number(discountPrice) < Number(price)
+      ? Number(discountPrice)
+      : Number(price);
+
   const cart = await Cart.findOne({ user: userId });
   const product = await Product.findById(productId).populate(
     "variants.colorId",
@@ -255,7 +276,7 @@ export const addToCartService = async (
           size,
           color,
           price,
-          discountPrice,
+          discountPrice: resolvedDiscountPrice,
           variantImage,
         },
       ],
@@ -279,7 +300,7 @@ export const addToCartService = async (
     ensureCartItemStock(product, existingItem, desiredQuantity);
     existingItem.quantity = desiredQuantity;
     existingItem.price = price;
-    existingItem.discountPrice = discountPrice;
+    existingItem.discountPrice = resolvedDiscountPrice;
     existingItem.variantImage = variantImage;
     if (variantId && !existingItem.variantId) {
       existingItem.variantId = variantId;
@@ -293,7 +314,7 @@ export const addToCartService = async (
       size,
       color,
       price,
-      discountPrice,
+      discountPrice: resolvedDiscountPrice,
       variantImage,
     });
   }
@@ -475,6 +496,10 @@ export const mergeGuestCartService = async (userId, guestItems) => {
       variantImage,
     } = guestItem;
     const normalizedQuantity = normalizeQuantity(quantity);
+    const resolvedDiscountPrice =
+      Number(discountPrice) > 0 && Number(discountPrice) < Number(price)
+        ? Number(discountPrice)
+        : Number(price);
     const product = await Product.findById(productId);
 
     if (!product) {
@@ -493,7 +518,7 @@ export const mergeGuestCartService = async (userId, guestItems) => {
       ensureCartItemStock(product, existingItem, desiredQuantity);
       existingItem.quantity = desiredQuantity;
       existingItem.price = price;
-      existingItem.discountPrice = discountPrice;
+      existingItem.discountPrice = resolvedDiscountPrice;
       if (variantImage) existingItem.variantImage = variantImage;
     } else {
       ensureCartItemStock(product, { size, color }, normalizedQuantity);
@@ -503,7 +528,7 @@ export const mergeGuestCartService = async (userId, guestItems) => {
         size,
         color,
         price,
-        discountPrice,
+        discountPrice: resolvedDiscountPrice,
         variantImage,
       });
     }

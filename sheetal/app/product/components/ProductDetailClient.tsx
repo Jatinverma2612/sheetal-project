@@ -598,13 +598,19 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
       selectedVariant.v_image,
       product.mainImage?.url || "/assets/placeholder-product.jpg",
     );
+    const resolvedDiscountPrice =
+      selectedSizeInfo.discountPrice > 0 &&
+      selectedSizeInfo.discountPrice < selectedSizeInfo.price
+        ? selectedSizeInfo.discountPrice
+        : selectedSizeInfo.price || 0;
+
     await addToCart(
       product._id,
       selectedVariant._id,
       quantity,
       selectedSize,
       selectedSizeInfo.price || 0,
-      selectedSizeInfo.discountPrice || 0,
+      resolvedDiscountPrice,
       variantImageUrl,
       selectedColor,
       {
