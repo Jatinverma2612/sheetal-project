@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePathname } from "next/navigation";
 import { bookAppointment } from "../services/appointmentServices";
 import toast from "react-hot-toast";
 import { X } from "lucide-react";
@@ -35,10 +36,16 @@ const Label = ({ text }: { text: string }) => (
 );
 
 const BookAppointmentWidget: React.FC = () => {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<AppointmentForm>(INITIAL_FORM);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Do not render on invoice download page
+  if (pathname?.startsWith("/checkout/download-invoice")) {
+    return null;
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -135,7 +142,7 @@ const BookAppointmentWidget: React.FC = () => {
     <>
       {/* Floating trigger */}
       <div
-        className="fixed bottom-16 sm:bottom-20 right-3 sm:right-6 md:right-8"
+        className="no-print print:hidden fixed bottom-16 sm:bottom-20 right-3 sm:right-6 md:right-8"
         style={{ zIndex: 9998, isolation: "isolate" }}
       >
         <div className="relative inline-block">
@@ -163,7 +170,7 @@ const BookAppointmentWidget: React.FC = () => {
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 flex items-center justify-center"
+          className="no-print print:hidden fixed inset-0 flex items-center justify-center"
           style={{
             zIndex: 99999,
             backgroundColor: "#362000d1",

@@ -293,17 +293,23 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
                   size.name,
                 );
 
-              const actualStock =
+              const currentVariantSize =
                 isAvailableForSelectedColor && selectedVariantSizes.length > 0
                   ? selectedVariantSizes.find(
                       (s) =>
                         canonicalizeSizeName(s.name) ===
                         canonicalizeSizeName(size.name),
-                    )?.stock
+                    )
                   : undefined;
 
-              const isSoldOut = actualStock !== undefined && actualStock <= 0;
-              const isDisabled = !isAvailableForSelectedColor;
+              const actualStock = currentVariantSize?.stock;
+
+              // Size has stock in at least one variant of the product
+              const hasStockAcrossVariants = Boolean(size.available);
+
+              // Truly disabled / sold out only if 0 stock across all variants
+              const isSoldOut = !hasStockAcrossVariants;
+              const isDisabled = !hasStockAcrossVariants;
 
               return (
                 <div key={size.name} className="flex flex-col items-center">

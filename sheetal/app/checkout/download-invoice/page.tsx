@@ -349,7 +349,9 @@ const InvoicePageInner = () => {
       <HideStorefrontHeader />
       <style>{`
         * { font-family: var(--font-montserrat), sans-serif; }
-        @media print { .no-print { display: none !important; } }
+        @media print {
+          .no-print, [class*="print:hidden"] { display: none !important; }
+        }
       `}</style>
 
       <div className="no-print mx-5 mt-4 mb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg bg-gray-100 p-4 border border-gray-200">

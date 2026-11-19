@@ -26,7 +26,7 @@ export const sendAppointmentConfirmationEmail = async (appointment) => {
     const replacements = {
       "{{id}}": appointment._id.toString().slice(-6).toUpperCase(),
       "{{name}}": appointment.name,
-      "{{date}}": new Date(appointment.appointmentDate).toLocaleDateString("en-IN"),
+      "{{date}}": new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
       "{{time}}": appointment.appointmentTime,
       "{{address}}": appointment.address,
       "{{city}}": appointment.city,
@@ -63,7 +63,7 @@ export const sendAppointmentPendingEmail = async (appointment) => {
       : `<p style="margin:0;font-size:18px;font-weight:700;color:#111827;">Studio By Sheetal</p>`;
 
     const formattedDate = appointment.appointmentDate
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN")
+      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
       : "To be scheduled by our team";
     const formattedTime = appointment.appointmentTime || "To be scheduled";
     const shortId = appointment._id
@@ -167,7 +167,7 @@ export const sendAppointmentCancelledEmail = async (appointment) => {
       : `<p style="margin:0;font-size:18px;font-weight:700;color:#111827;">Studio By Sheetal</p>`;
 
     const formattedDate = appointment.appointmentDate
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN")
+      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
       : "N/A";
     const formattedTime = appointment.appointmentTime || "N/A";
     const shortId = appointment._id

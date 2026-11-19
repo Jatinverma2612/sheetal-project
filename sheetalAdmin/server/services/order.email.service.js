@@ -187,10 +187,12 @@ export const sendOrderConfirmationEmail = async ({ order, user }) => {
       userName: user.name || order.shippingAddress?.fullName || "Customer",
       submittedOn: new Date(order.createdAt || Date.now()).toLocaleString(
         "en-IN",
+        { timeZone: "Asia/Kolkata" }
       ),
       orderId: order._id,
       orderDate: new Date(order.createdAt || Date.now()).toLocaleString(
         "en-IN",
+        { timeZone: "Asia/Kolkata" }
       ),
       orderStatus: order.orderStatus || "Processing",
       items,
@@ -516,7 +518,10 @@ export const sendOrderStatusUpdateEmail = async ({
     html: orderStatusUpdateTemplate({
       userName,
       orderId: order._id,
-      orderDate: new Date(order.createdAt || Date.now()).toLocaleString("en-IN"),
+      orderDate: new Date(order.createdAt || Date.now()).toLocaleString(
+        "en-IN",
+        { timeZone: "Asia/Kolkata" }
+      ),
       orderStatus: statusToDisplay,
       activeItems: formattedActiveItems,
       cancelledItems: formattedCancelledItems,

@@ -834,13 +834,53 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
 
   const handleSizeChange = (sizeName: string) => {
     const canonical = canonicalizeSizeName(sizeName);
-    setSelectedSize(canonical);
-    if (selectedVariantData) {
-      const foundSize = selectedVariantData.sizes.find(
-        (s) => canonicalizeSizeName(s.name) === canonical,
+
+    // 1. Check if the currently selected variant has this size with stock > 0
+    let targetVariant = selectedVariantData;
+    let foundSize = targetVariant?.sizes?.find(
+      (s) => canonicalizeSizeName(s.name) === canonical,
+    );
+
+    // If current variant does not have this size or has stock <= 0, search other variants
+    if (!foundSize || foundSize.stock <= 0) {
+      // Prioritize a variant that has this size in stock
+      const variantWithStock = product?.variants?.find((v) =>
+        v.sizes?.some(
+          (s) => canonicalizeSizeName(s.name) === canonical && s.stock > 0,
+        ),
       );
-      setSelectedSizeObject(foundSize || null);
+
+      const targetToSwitch =
+        variantWithStock ||
+        product?.variants?.find((v) =>
+          v.sizes?.some((s) => canonicalizeSizeName(s.name) === canonical),
+        );
+
+      if (targetToSwitch && targetToSwitch !== selectedVariantData) {
+        targetVariant = targetToSwitch;
+        foundSize = targetVariant.sizes?.find(
+          (s) => canonicalizeSizeName(s.name) === canonical,
+        );
+
+        if (targetVariant.color?.name) {
+          const colorName = targetVariant.color.name;
+          const colorOption = allUniqueColors.find((c) => c.name === colorName) || {
+            name: colorName,
+            image: getApiImageUrl(
+              targetVariant.v_image,
+              product?.mainImage?.url || "/assets/placeholder-product.jpg",
+            ),
+          };
+          setSelectedColor(colorName);
+          setSelectedVariantData(targetVariant);
+          const nextGallery = getVariantGalleryUrls(product, targetVariant);
+          setSelectedImage(nextGallery[0] || colorOption.image);
+        }
+      }
     }
+
+    setSelectedSize(canonical);
+    setSelectedSizeObject(foundSize || null);
   };
 
   // ── Price derivation ──────────────────────────────────────────────────────
