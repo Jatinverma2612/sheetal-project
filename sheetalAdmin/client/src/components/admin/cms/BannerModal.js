@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Upload,
@@ -39,6 +39,15 @@ export default function BannerModal({
   const [mobilePreview, setMobilePreview] = useState("");
   const [selectedDesktopFile, setSelectedDesktopFile] = useState(null);
   const [selectedMobileFile, setSelectedMobileFile] = useState(null);
+  const desktopInputRef = useRef(null);
+  const mobileInputRef = useRef(null);
+
+  const resetFileState = () => {
+    setSelectedDesktopFile(null);
+    setSelectedMobileFile(null);
+    if (desktopInputRef.current) desktopInputRef.current.value = "";
+    if (mobileInputRef.current) mobileInputRef.current.value = "";
+  };
 
   const isEdit = !!initialData;
 
@@ -165,6 +174,7 @@ export default function BannerModal({
         } else {
           setMobilePreview(null);
         }
+        resetFileState();
       } else {
         // Reset for new banner
         setFormData({
@@ -174,8 +184,7 @@ export default function BannerModal({
         });
         setDesktopPreview("");
         setMobilePreview("");
-        setSelectedDesktopFile(null);
-        setSelectedMobileFile(null);
+        resetFileState();
         setLinkType("custom");
         setCustomLink("");
         setSelectedCategorySlug("");
@@ -185,6 +194,13 @@ export default function BannerModal({
       }
     }
   }, [initialData, isOpen]);
+
+  const handleClose = () => {
+    resetFileState();
+    setDesktopPreview("");
+    setMobilePreview("");
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -303,7 +319,7 @@ export default function BannerModal({
       if (res.success) {
         toast.success(isEdit ? "Banner Updated!" : "Banner Created!");
         onSuccess();
-        onClose();
+        handleClose();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Operation failed. Please try again.");
@@ -331,7 +347,7 @@ export default function BannerModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-slate-400 hover:text-slate-900 cursor-pointer hover:bg-slate-100 p-1.5 rounded-lg transition"
           >
             <X size={20} />
@@ -355,6 +371,7 @@ export default function BannerModal({
                     accept="image/*"
                     onChange={handleDesktopImageChange}
                     className="hidden"
+                    ref={desktopInputRef}
                     id="desktop-banner-img-input"
                   />
                   <label
@@ -385,6 +402,7 @@ export default function BannerModal({
                     accept="image/*"
                     onChange={handleMobileImageChange}
                     className="hidden"
+                    ref={mobileInputRef}
                     id="mobile-banner-img-input"
                   />
                   <label

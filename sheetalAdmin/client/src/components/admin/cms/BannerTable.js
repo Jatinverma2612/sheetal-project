@@ -280,7 +280,16 @@ export default function BannerTable({ refreshStats, refreshKey }) {
         </div>
       </DndContext>
 
-      <BannerModal isOpen={showModal} onClose={() => setShowModal(false)} onSuccess={fetchBanners} initialData={editData} />
+      <BannerModal
+        key={editData?._id || "new-banner"}
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditData(null);
+        }}
+        onSuccess={fetchBanners}
+        initialData={editData}
+      />
       <DeleteConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
