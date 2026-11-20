@@ -289,10 +289,10 @@ export const mergeGuestCartOnLogin = async (): Promise<void> => {
   if (guestItems.length === 0) return;
 
   isMergingGuestCart = true;
-  clearGuestCart();
 
   const payload = guestItems.map((g) => ({
     productId: g.productId,
+    variantId: g.variantId,
     quantity: g.quantity,
     size: g.size,
     color: g.color,
@@ -302,11 +302,15 @@ export const mergeGuestCartOnLogin = async (): Promise<void> => {
   }));
 
   try {
-    await mergeGuestCartApi(payload);
+    const res = await mergeGuestCartApi(payload);
+    if (res?.success) {
+      clearGuestCart();
+    }
   } catch (err) {
     console.error("Failed to merge guest cart:", err);
   } finally {
     isMergingGuestCart = false;
+    dispatchCartUpdated();
   }
 };
 
@@ -563,12 +567,6 @@ export const useCart = (): UseCartReturn => {
 
         if (rawToken && isTokenExpired(rawToken)) {
           logout();
-          if (typeof window !== "undefined") {
-            const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-            storeRedirectTarget(currentPath);
-            window.location.href = "/login";
-          }
-          return;
         }
 
         if (isAuthenticated()) {

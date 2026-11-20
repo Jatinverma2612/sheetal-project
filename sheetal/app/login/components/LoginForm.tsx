@@ -23,6 +23,8 @@ import {
 } from "../../services/firebase";
 import { verifyIdToken, login } from "../../services/authService";
 import { mergeGuestCartOnLogin } from "../../hooks/useCart";
+import { mergeGuestWishlistOnLogin } from "../../hooks/useWishlist";
+import { dispatchCartUpdated, dispatchWishlistUpdated } from "../../hooks/shopEvents";
 import {
   consumeRedirectTarget,
   syncRedirectFromQuery,
@@ -266,7 +268,12 @@ const LoginForm = ({
         return;
       }
       login(data.token, data.user);
-      await mergeGuestCartOnLogin();
+      await Promise.allSettled([
+        mergeGuestCartOnLogin(),
+        mergeGuestWishlistOnLogin(),
+      ]);
+      dispatchCartUpdated();
+      dispatchWishlistUpdated();
       toast.success("Logged in successfully!");
       const redirectUrl = consumeRedirectTarget();
       if (redirectUrl) {

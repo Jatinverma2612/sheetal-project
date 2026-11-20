@@ -18,6 +18,16 @@ export const toggleWishlist = async (productId: string) => {
   });
 };
 
+export const mergeGuestWishlist = async (productIds: string[]) => {
+  return apiFetch("/users/wishlist/merge-guest", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ productIds }),
+  });
+};
+
 export interface ProductImage {
   url: string;
   alt: string;

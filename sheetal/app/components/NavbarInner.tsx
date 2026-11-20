@@ -39,6 +39,19 @@ import { getLogoUrl } from "../services/settingsService";
 const SearchModal = dynamic(() => import("./SearchModal"));
 
 const GUEST_CART_KEY = "guest_cart";
+const GUEST_WISHLIST_KEY = "guest_wishlist";
+
+const readGuestWishlistCount = () => {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(GUEST_WISHLIST_KEY);
+    if (!raw) return 0;
+    const items = JSON.parse(raw);
+    return Array.isArray(items) ? items.length : 0;
+  } catch {
+    return 0;
+  }
+};
 
 const readGuestCartCount = () => {
   if (typeof window === "undefined") return 0;
@@ -886,16 +899,14 @@ const NavbarInner = ({
   const moreMeasureRef = useRef<HTMLLIElement | null>(null);
   const navItems = useMemo(() => initialNavItems, [initialNavItems]);
   const pathname = usePathname();
-  const wishlistHref = isAuthenticatedUser
-    ? "/wishlist"
-    : "/login?redirect=/wishlist";
+  const wishlistHref = "/wishlist";
 
   const syncNavCounts = useCallback(async () => {
     const authenticated = isAuthenticated();
     setIsAuthenticatedUser(authenticated);
 
     if (!authenticated) {
-      setWishlistCount(0);
+      setWishlistCount(readGuestWishlistCount());
       setCartItemCount(readGuestCartCount());
       return;
     }
@@ -921,7 +932,7 @@ const NavbarInner = ({
           : 0,
       );
     } catch {
-      setWishlistCount(0);
+      setWishlistCount(readGuestWishlistCount());
       setCartItemCount(readGuestCartCount());
     }
   }, []);
@@ -940,7 +951,7 @@ const NavbarInner = ({
         setCurrentUser(getUserDetails());
       } else {
         setCurrentUser(null);
-        setWishlistCount(0);
+        setWishlistCount(readGuestWishlistCount());
         setCartItemCount(readGuestCartCount());
       }
 

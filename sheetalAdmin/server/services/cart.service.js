@@ -486,51 +486,80 @@ export const mergeGuestCartService = async (userId, guestItems) => {
   }
 
   for (const guestItem of guestItems) {
-    const {
-      productId,
-      quantity,
-      size,
-      color,
-      price,
-      discountPrice,
-      variantImage,
-    } = guestItem;
-    const normalizedQuantity = normalizeQuantity(quantity);
-    const resolvedDiscountPrice =
-      Number(discountPrice) > 0 && Number(discountPrice) < Number(price)
-        ? Number(discountPrice)
-        : Number(price);
-    const product = await Product.findById(productId);
-
-    if (!product) {
-      continue;
-    }
-
-    const existingItem = cart.items.find(
-      (item) =>
-        item.product.toString() === productId &&
-        item.size === size &&
-        item.color === color,
-    );
-
-    if (existingItem) {
-      const desiredQuantity = Math.max(existingItem.quantity, normalizedQuantity);
-      ensureCartItemStock(product, existingItem, desiredQuantity);
-      existingItem.quantity = desiredQuantity;
-      existingItem.price = price;
-      existingItem.discountPrice = resolvedDiscountPrice;
-      if (variantImage) existingItem.variantImage = variantImage;
-    } else {
-      ensureCartItemStock(product, { size, color }, normalizedQuantity);
-      cart.items.push({
-        product: productId,
-        quantity: normalizedQuantity,
+    try {
+      const {
+        productId,
+        variantId,
+        quantity,
         size,
         color,
         price,
-        discountPrice: resolvedDiscountPrice,
+        discountPrice,
         variantImage,
-      });
+      } = guestItem;
+      const normalizedQuantity = normalizeQuantity(quantity);
+      if (normalizedQuantity <= 0) continue;
+
+      const resolvedDiscountPrice =
+        Number(discountPrice) > 0 && Number(discountPrice) < Number(price)
+          ? Number(discountPrice)
+          : Number(price);
+      const product = await Product.findById(productId).populate(
+        "variants.colorId",
+      );
+
+      if (!product) {
+        continue;
+      }
+
+      const existingItem = cart.items.find(
+        (item) =>
+          item.product.toString() === productId &&
+          (variantId && item.variantId ? item.variantId === variantId : true) &&
+          item.size === size &&
+          item.color === color,
+      );
+
+      if (existingItem) {
+        const desiredQuantity = Math.max(existingItem.quantity, normalizedQuantity);
+        try {
+          ensureCartItemStock(product, existingItem, desiredQuantity);
+        } catch (stockErr) {
+          logger.warn(
+            { userId, productId, error: stockErr.message },
+            "[Cart] Stock limitation during merge, preserving available quantity",
+          );
+        }
+        existingItem.quantity = desiredQuantity;
+        existingItem.price = price;
+        existingItem.discountPrice = resolvedDiscountPrice;
+        if (variantImage) existingItem.variantImage = variantImage;
+        if (variantId && !existingItem.variantId) existingItem.variantId = variantId;
+      } else {
+        try {
+          ensureCartItemStock(product, { size, color, variantId }, normalizedQuantity);
+        } catch (stockErr) {
+          logger.warn(
+            { userId, productId, error: stockErr.message },
+            "[Cart] Stock limitation during merge new item, continuing",
+          );
+        }
+        cart.items.push({
+          product: productId,
+          variantId: variantId || undefined,
+          quantity: normalizedQuantity,
+          size,
+          color,
+          price,
+          discountPrice: resolvedDiscountPrice,
+          variantImage,
+        });
+      }
+    } catch (err) {
+      logger.error(
+        { userId, guestItem, error: err.message },
+        "[Cart] Error merging guest cart item",
+      );
     }
   }
 

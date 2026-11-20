@@ -152,11 +152,6 @@ const CartPage = () => {
   const handleMoveToWishlist = async () => {
     if (isProcessing) return;
 
-    if (!isAuthenticated()) {
-      redirectToLogin(router, "/cart");
-      return;
-    }
-
     setIsProcessing(true);
     try {
       if (isBulkAction) {

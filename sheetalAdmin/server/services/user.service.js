@@ -43,6 +43,45 @@ export const toggleWishlistService = async (userId, productId) => {
   return { success: true, message, data: user.wishlist };
 };
 
+export const mergeGuestWishlistService = async (userId, productIds) => {
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return { success: true, message: "Nothing to merge", data: [] };
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return { success: false, statusCode: 404, message: "User not found" };
+  }
+
+  if (!Array.isArray(user.wishlist)) {
+    user.wishlist = [];
+  }
+
+  const existingIds = new Set(user.wishlist.map((id) => id.toString()));
+
+  for (const pid of productIds) {
+    const cleanId = String(pid?._id || pid || "").trim();
+    if (mongoose.Types.ObjectId.isValid(cleanId) && !existingIds.has(cleanId)) {
+      user.wishlist.push(cleanId);
+      existingIds.add(cleanId);
+    }
+  }
+
+  await user.save();
+
+  const updatedUser = await User.findById(userId).populate({
+    path: "wishlist",
+    select:
+      "_id name slug mainImage hoverImage stock variants.v_sku variants.color variants.sizes.name variants.sizes.stock variants.sizes.price variants.sizes.discountPrice",
+  });
+
+  return {
+    success: true,
+    message: "Guest wishlist merged successfully",
+    data: updatedUser?.wishlist || user.wishlist,
+  };
+};
+
 export const getMeService = async (userId) => {
   const user = await User.findById(userId)
     .select("-password")

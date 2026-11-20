@@ -9,7 +9,7 @@ import { buildProductHref } from "../../utils/productRoutes";
 interface ProductCardProps {
   product: any;
   isWishlisted?: boolean;
-  onToggleWishlist?: (productId: string) => void;
+  onToggleWishlist?: (productId: string, product?: any) => void;
 }
 
 const ProductCard = ({
@@ -53,7 +53,7 @@ const ProductCard = ({
             aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             onClick={() => {
               if (wishlistProductId && onToggleWishlist) {
-                onToggleWishlist(wishlistProductId);
+                onToggleWishlist(wishlistProductId, product);
               }
             }}
           >

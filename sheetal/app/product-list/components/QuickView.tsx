@@ -374,9 +374,6 @@ const QuickView: React.FC<QuickViewProps> = ({ productSlug, onClose }) => {
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (rawToken && isTokenExpired(rawToken)) {
       logout();
-      redirectToLogin(router);
-      onClose();
-      return;
     }
 
     if (product) {
@@ -557,7 +554,7 @@ const QuickView: React.FC<QuickViewProps> = ({ productSlug, onClose }) => {
 
   const handleToggleWishlist = React.useCallback(() => {
     if (!product) return;
-    toggleProductInWishlist(product._id);
+    toggleProductInWishlist(product._id, product);
   }, [product, toggleProductInWishlist]);
 
   return (

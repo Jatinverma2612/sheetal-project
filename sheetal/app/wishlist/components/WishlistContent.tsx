@@ -1,11 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { useWishlist } from "../../hooks/useWishlist";
+import { useCart } from "../../hooks/useCart";
 import WishlistItemCard from "./WishlistItemCard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { addToCart as addToCartApi } from "../../services/cartService";
 import { getApiImageUrl } from "../../services/api";
 import {
   Product,
@@ -24,6 +24,7 @@ import {
 
 const WishlistContent = () => {
   const { wishlist, loading, toggleProductInWishlist } = useWishlist();
+  const { addToCart } = useCart();
   const router = useRouter();
   const [movingToCart, setMovingToCart] = useState<string | null>(null);
 
@@ -33,16 +34,10 @@ const WishlistContent = () => {
   const handleMoveToCart = async (product: Product) => {
     if (movingToCart) return;
 
-    if (!isAuthenticated()) {
-      logout();
-      redirectToLogin(router);
-      return;
-    }
-
-    const selectedVariant = product.variants.find((variant) =>
+    const selectedVariant = product.variants?.find((variant) =>
       variant.sizes?.some((size) => size.stock > 0),
     );
-    const selectedSize = selectedVariant?.sizes.find((size) => size.stock > 0);
+    const selectedSize = selectedVariant?.sizes?.find((size) => size.stock > 0);
 
     if (!selectedVariant || !selectedSize) {
       toast.error("This item is currently unavailable.");
@@ -54,7 +49,6 @@ const WishlistContent = () => {
       product.mainImage?.url || "/assets/placeholder-product.jpg",
     );
 
-    // Snapshot for potential rollback
     const productId = product._id;
     
     try {
@@ -63,50 +57,30 @@ const WishlistContent = () => {
       // Optimistically hide from wishlist
       setOptimisticRemovedIds(prev => new Set(prev).add(productId));
 
-      const cartResponse = await addToCartApi(
+      await addToCart(
         productId,
         selectedVariant._id,
         1,
         selectedSize.name,
         selectedSize.price || 0,
         selectedSize.discountPrice || selectedSize.price || 0,
-        selectedVariant.color?.name || "",
         variantImage,
+        selectedVariant.color?.name || "",
+        {
+          _id: product._id,
+          name: product.name,
+          slug: product.slug,
+          mainImage: product.mainImage,
+        },
+        selectedSize.stock,
       );
 
-      if (!cartResponse.success) {
-        // Rollback on cart failure
-        setOptimisticRemovedIds(prev => {
-          const next = new Set(prev);
-          next.delete(productId);
-          return next;
-        });
-        if (
-          (cartResponse as any).unauthorized ||
-          isAuthExpiredError(cartResponse.message)
-        ) {
-          logout();
-          redirectToLogin(router);
-          return;
-        }
-        toast.error(cartResponse.message || "Failed to move item to cart.");
-        return;
-      }
+      // Remove from wishlist (handles both authenticated server & guest localStorage)
+      await toggleProductInWishlist(productId);
 
-      // Sync backend wishlist (remove item)
-      // We don't wait for this to update UI since we already hid it optimistically
-      void toggleWishlistApi(productId).then((wishlistResponse) => {
-         if (wishlistResponse.success) {
-            dispatchWishlistUpdated();
-         } else {
-            console.error("Failed to remove from wishlist after cart add:", wishlistResponse.message);
-         }
-      });
-
-      dispatchCartUpdated();
       toast.success("Item moved to cart!");
     } catch (error) {
-      // Rollback on network failure
+      // Rollback on failure
       setOptimisticRemovedIds(prev => {
         const next = new Set(prev);
         next.delete(productId);
@@ -138,9 +112,16 @@ const WishlistContent = () => {
       });
     });
 
-    if (lowestPrice === Infinity) {
-      lowestPrice = 0;
-      lowestMrp = 0;
+    if (lowestPrice === Infinity || lowestPrice === 0) {
+      const fallbackPrice = Number(p.price) || Number((p as any).discountPrice) || 0;
+      const fallbackMrp = Number((p as any).mrp) || fallbackPrice;
+      if (fallbackPrice > 0) {
+        lowestPrice = fallbackPrice;
+        lowestMrp = fallbackMrp;
+      } else {
+        lowestPrice = 0;
+        lowestMrp = 0;
+      }
     }
 
     const discountPercent =
@@ -161,7 +142,7 @@ const WishlistContent = () => {
     const totalStock =
       typeof variantTotalStock === "number" && p.variants && p.variants.length > 0
         ? variantTotalStock
-        : (Number(p.stock) || 0);
+        : (typeof p.stock === "number" ? Number(p.stock) : ((p as any).soldOut ? 0 : 10));
 
     return {
       ...p,

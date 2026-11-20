@@ -102,6 +102,7 @@ export const checkoutExit = async () => {
 export const mergeGuestCart = async (
   guestItems: Array<{
     productId: string;
+    variantId?: string;
     quantity: number;
     size: string;
     color: string;

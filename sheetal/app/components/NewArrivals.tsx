@@ -152,7 +152,7 @@ const NewArrivals = ({ content }: { content?: NewArrivalsContent }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleProductInWishlist(product._id);
+                toggleProductInWishlist(product._id, product);
               }}
             >
               <Image

@@ -567,8 +567,6 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (rawToken && isTokenExpired(rawToken)) {
       logout();
-      redirectToLogin(router);
-      return;
     }
 
     if (!product || !selectedSize || !selectedColor) {
@@ -1047,7 +1045,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
               onImageChange={handleImageChange}
               title={product.name}
               isWishlisted={isProductInWishlist(product._id)}
-              onToggleWishlist={() => toggleProductInWishlist(product._id)}
+              onToggleWishlist={() => toggleProductInWishlist(product._id, product)}
               onScrollToSimilar={scrollToSimilarProducts}
               videoUrl={
                 selectedVariantData?.v_video?.url
@@ -1134,7 +1132,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
         setSelectedSize={setSelectedSize}
         sizeChartData={isFreeSizeOnly ? null : sizeChartData}
         onAddToCart={handleAddToCart}
-        onAddToWishlist={() => toggleProductInWishlist(product._id)}
+        onAddToWishlist={() => toggleProductInWishlist(product._id, product)}
         isWishlisted={isProductInWishlist(product._id)}
       />
 

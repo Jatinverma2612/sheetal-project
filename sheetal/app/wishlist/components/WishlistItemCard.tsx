@@ -25,22 +25,35 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
 }) => {
   const productHref = buildProductHref(product);
   const fallbackImage = "/assets/placeholder-product.jpg";
-  const [imgSrc, setImgSrc] = React.useState(
-    product.mainImage?.url || fallbackImage,
-  );
-  const [hoverImgSrc, setHoverImgSrc] = React.useState(
-    product.hoverImage?.url || product.mainImage?.url || fallbackImage,
-  );
+  const resolvedMainImage =
+    product.mainImage?.url ||
+    (typeof (product as any).image === "string" ? (product as any).image : null) ||
+    fallbackImage;
+  const resolvedHoverImage =
+    product.hoverImage?.url ||
+    (typeof (product as any).hoverImage === "string" ? (product as any).hoverImage : null) ||
+    resolvedMainImage;
+
+  const [imgSrc, setImgSrc] = React.useState(resolvedMainImage);
+  const [hoverImgSrc, setHoverImgSrc] = React.useState(resolvedHoverImage);
 
   React.useEffect(() => {
-    setImgSrc(product.mainImage?.url || fallbackImage);
-  }, [product.mainImage?.url]);
+    setImgSrc(
+      product.mainImage?.url ||
+      (typeof (product as any).image === "string" ? (product as any).image : null) ||
+      fallbackImage,
+    );
+  }, [product.mainImage?.url, (product as any).image]);
 
   React.useEffect(() => {
     setHoverImgSrc(
-      product.hoverImage?.url || product.mainImage?.url || fallbackImage,
+      product.hoverImage?.url ||
+      (typeof (product as any).hoverImage === "string" ? (product as any).hoverImage : null) ||
+      product.mainImage?.url ||
+      (typeof (product as any).image === "string" ? (product as any).image : null) ||
+      fallbackImage,
     );
-  }, [product.hoverImage?.url, product.mainImage?.url]);
+  }, [product.hoverImage?.url, (product as any).hoverImage, product.mainImage?.url, (product as any).image]);
 
   const effectiveStock =
     typeof product.totalStock === "number"

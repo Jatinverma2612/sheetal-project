@@ -30,6 +30,20 @@ export const toggleWishlist = async (req, res, next) => {
   }
 };
 
+export const mergeGuestWishlist = async (req, res, next) => {
+  try {
+    const { productIds } = req.body;
+    const result = await userService.mergeGuestWishlistService(
+      req.user._id,
+      productIds,
+    );
+    if (!result.success) return res.status(result.statusCode).json(result);
+    return successResponse(res, 200, result.data, result.message);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getMe = async (req, res, next) => {
   try {
     const result = await userService.getMeService(req.user._id);

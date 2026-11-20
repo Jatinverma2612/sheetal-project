@@ -24,14 +24,14 @@ interface Product {
 interface ProductGridProps {
   products: Product[];
   viewMode: "grid" | "list";
-  onToggleWishlist: (productId: string) => void;
+  onToggleWishlist: (productId: string, product?: any) => void;
   onQuickView: (productSlug: string) => void;
 }
 
 const ProductCard: React.FC<{
   product: Product;
   viewMode: "grid" | "list";
-  onToggleWishlist: (productId: string) => void;
+  onToggleWishlist: (productId: string, product?: any) => void;
   onQuickView: (productSlug: string) => void;
 }> = ({ product, viewMode, onToggleWishlist, onQuickView }) => {
   const productHref = buildProductHref(product);
@@ -95,7 +95,7 @@ const ProductCard: React.FC<{
         <div className="absolute top-2 right-2 flex flex-col gap-3">
           <button
             className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center group/icon cursor-pointer"
-            onClick={() => onToggleWishlist(product._id)}
+            onClick={() => onToggleWishlist(product._id, product)}
             aria-label={product.isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Image

@@ -17,6 +17,8 @@ import {
 } from "../../services/firebase";
 import { verifyIdToken, login } from "../../services/authService";
 import { mergeGuestCartOnLogin } from "../../hooks/useCart";
+import { mergeGuestWishlistOnLogin } from "../../hooks/useWishlist";
+import { dispatchCartUpdated, dispatchWishlistUpdated } from "../../hooks/shopEvents";
 import { consumeRedirectTarget, syncRedirectFromQuery } from "../../utils/authRedirect";
 import toast from "react-hot-toast";
 
@@ -207,8 +209,13 @@ const OtpForm = () => {
         sessionStorage.removeItem(RESEND_AVAILABLE_AT_KEY);
         window.confirmationResult = undefined;
         resetRecaptcha(RECAPTCHA_CONTAINER_ID);
-        // Merge any guest cart items into the user's server cart
-        await mergeGuestCartOnLogin();
+        // Merge any guest cart and wishlist items into the user's server account
+        await Promise.allSettled([
+          mergeGuestCartOnLogin(),
+          mergeGuestWishlistOnLogin(),
+        ]);
+        dispatchCartUpdated();
+        dispatchWishlistUpdated();
         toast.success("Logged in successfully!");
         const redirectUrl = consumeRedirectTarget();
         if (redirectUrl) {

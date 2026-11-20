@@ -6,28 +6,84 @@ import toast from "react-hot-toast";
 import {
   fetchWishlist,
   toggleWishlist as toggleWishlistApi,
+  mergeGuestWishlist,
+  fetchProducts,
   Product,
 } from "../services/productService";
 import {
   isAuthenticated,
   logout,
-  isTokenExpired,
   isAuthExpiredError,
+  AUTH_UPDATED_EVENT,
 } from "../services/authService";
 import {
   dispatchWishlistUpdated,
   WISHLIST_UPDATED_EVENT,
 } from "./shopEvents";
 import {
-  consumeRedirectModalState,
   redirectToLogin,
 } from "../utils/authRedirect";
+
+export const GUEST_WISHLIST_KEY = "guest_wishlist";
+
+export const readGuestWishlist = (): Product[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(GUEST_WISHLIST_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+export const writeGuestWishlist = (items: Product[]) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(items));
+};
+
+export const clearGuestWishlist = () => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(GUEST_WISHLIST_KEY);
+};
+
+let isMergingGuestWishlist = false;
+
+/**
+ * Merges localStorage guest wishlist into the authenticated user's server wishlist.
+ * Called immediately after a successful login.
+ */
+export const mergeGuestWishlistOnLogin = async (): Promise<void> => {
+  if (isMergingGuestWishlist) return;
+  const guestItems = readGuestWishlist();
+  if (guestItems.length === 0) return;
+
+  isMergingGuestWishlist = true;
+  try {
+    const productIds = guestItems
+      .map((p) => (typeof p === "string" ? p : p?._id))
+      .filter(Boolean);
+
+    if (productIds.length > 0) {
+      const res = await mergeGuestWishlist(productIds);
+      if (res?.success) {
+        clearGuestWishlist();
+      }
+    }
+  } catch (err) {
+    console.error("Failed to merge guest wishlist:", err);
+  } finally {
+    isMergingGuestWishlist = false;
+    dispatchWishlistUpdated();
+  }
+};
 
 export interface UseWishlistReturn {
   wishlist: Product[];
   loading: boolean;
   error: string | null;
-  toggleProductInWishlist: (productId: string) => Promise<void>;
+  toggleProductInWishlist: (productId: string, productData?: Product) => Promise<void>;
   isProductInWishlist: (productId: string) => boolean;
   isLoginModalOpen: boolean;
   closeLoginModal: () => void;
@@ -50,8 +106,11 @@ const isUnauthorized = (err: ErrorLike): boolean =>
 
 let cachedWishlistSnapshot: Product[] | null = null;
 
-const getInitialWishlistSnapshot = (): Product[] =>
-  cachedWishlistSnapshot ?? [];
+const getInitialWishlistSnapshot = (): Product[] => {
+  if (cachedWishlistSnapshot) return cachedWishlistSnapshot;
+  if (typeof window === "undefined") return [];
+  return isAuthenticated() ? [] : readGuestWishlist();
+};
 
 const commitWishlistSnapshot = (items: Product[]): Product[] => {
   cachedWishlistSnapshot = items;
@@ -61,22 +120,86 @@ const commitWishlistSnapshot = (items: Product[]): Product[] => {
 export const useWishlist = (): UseWishlistReturn => {
   const router = useRouter();
   const [wishlist, setWishlist] = useState<Product[]>(() => getInitialWishlistSnapshot());
-  const [optimisticWishlistIds, setOptimisticWishlistIds] = useState<Set<string>>(new Set());
+  const [optimisticWishlistIds, setOptimisticWishlistIds] = useState<Set<string>>(() => {
+    const initial = getInitialWishlistSnapshot();
+    return new Set(
+      initial.map((p) => (typeof p === "string" ? p : p?._id)).filter(Boolean),
+    );
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Sync optimistic set with actual wishlist whenever it changes
   useEffect(() => {
-    setOptimisticWishlistIds(new Set(wishlist.map((p) => p._id)));
+    setOptimisticWishlistIds(
+      new Set(
+        wishlist
+          .map((p) => (typeof p === "string" ? p : p?._id))
+          .filter(Boolean),
+      ),
+    );
   }, [wishlist]);
 
   const loadWishlist = useCallback(async (showLoader: boolean = true) => {
     if (!isAuthenticated()) {
-      setWishlist(commitWishlistSnapshot([]));
-      if (showLoader) {
-        setLoading(false);
+      const rawGuest = readGuestWishlist();
+      const productIds = rawGuest
+        .map((p) => (typeof p === "string" ? p : p?._id))
+        .filter(Boolean);
+
+      if (productIds.length === 0) {
+        setWishlist(commitWishlistSnapshot([]));
+        if (showLoader) setLoading(false);
+        return;
       }
+
+      // Check if any guest items need hydration from server
+      const needsHydration = rawGuest.some(
+        (p) =>
+          !p ||
+          typeof p === "string" ||
+          !p.name ||
+          p.name === "Product" ||
+          !Array.isArray(p.variants) ||
+          p.variants.length === 0 ||
+          !p.mainImage?.url,
+      );
+
+      if (needsHydration) {
+        if (showLoader) setLoading(true);
+        try {
+          const response = await fetchProducts({
+            ids: productIds.join(","),
+            limit: 100,
+          });
+
+          if (
+            response?.success &&
+            Array.isArray(response.products) &&
+            response.products.length > 0
+          ) {
+            const productMap = new Map(
+              response.products.map((p) => [String(p._id), p]),
+            );
+            const hydrated = productIds
+              .map((id) => productMap.get(String(id)))
+              .filter(Boolean) as Product[];
+
+            if (hydrated.length > 0) {
+              writeGuestWishlist(hydrated);
+              setWishlist(commitWishlistSnapshot(hydrated));
+              if (showLoader) setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to hydrate guest wishlist products:", err);
+        }
+      }
+
+      setWishlist(commitWishlistSnapshot(rawGuest));
+      if (showLoader) setLoading(false);
       return;
     }
 
@@ -88,6 +211,12 @@ export const useWishlist = (): UseWishlistReturn => {
       const response = await fetchWishlist();
       if (response.success && Array.isArray(response.data)) {
         setWishlist(commitWishlistSnapshot(response.data));
+
+        // Auto-merge guest items if any were left in localStorage
+        const guestItems = readGuestWishlist();
+        if (guestItems.length > 0) {
+          void mergeGuestWishlistOnLogin();
+        }
       } else {
         setWishlist(commitWishlistSnapshot([]));
       }
@@ -110,17 +239,119 @@ export const useWishlist = (): UseWishlistReturn => {
     loadWishlist();
   }, [loadWishlist]);
 
+  useEffect(() => {
+    const handleWishlistUpdated = () => {
+      loadWishlist(false);
+    };
+    const handleAuthUpdated = () => {
+      loadWishlist(false);
+    };
+
+    window.addEventListener(WISHLIST_UPDATED_EVENT, handleWishlistUpdated);
+    window.addEventListener(AUTH_UPDATED_EVENT, handleAuthUpdated);
+
+    return () => {
+      window.removeEventListener(WISHLIST_UPDATED_EVENT, handleWishlistUpdated);
+      window.removeEventListener(AUTH_UPDATED_EVENT, handleAuthUpdated);
+    };
+  }, [loadWishlist]);
+
   const toggleProductInWishlist = useCallback(
-    async (productId: string) => {
+    async (productId: string, productData?: Product) => {
       if (!isAuthenticated()) {
-        logout();
-        redirectToLogin(router);
+        const guestItems = readGuestWishlist();
+        const exists = guestItems.some(
+          (p) => String(typeof p === "string" ? p : p?._id) === String(productId),
+        );
+
+        if (exists) {
+          const updated = guestItems.filter(
+            (p) => String(typeof p === "string" ? p : p?._id) !== String(productId),
+          );
+          writeGuestWishlist(updated);
+          setWishlist(commitWishlistSnapshot(updated));
+          dispatchWishlistUpdated();
+          toast.success("Removed from wishlist");
+          return;
+        }
+
+        // Check if passed productData is complete
+        const hasFullData =
+          productData &&
+          productData.name &&
+          productData.name !== "Product" &&
+          Array.isArray(productData.variants) &&
+          productData.variants.length > 0 &&
+          Boolean(productData.mainImage?.url || (productData as any).image);
+
+        if (hasFullData) {
+          const updated = [...guestItems, productData!];
+          writeGuestWishlist(updated);
+          setWishlist(commitWishlistSnapshot(updated));
+          dispatchWishlistUpdated();
+          toast.success("Added to wishlist!");
+          return;
+        }
+
+        // Optimistically show added toast & update IDs
+        toast.success("Added to wishlist!");
+        setOptimisticWishlistIds((prev) => new Set(prev).add(productId));
+
+        // Fetch full product details from API
+        try {
+          const response = await fetchProducts({ ids: productId, limit: 1 });
+          const fetchedProduct =
+            response?.success && Array.isArray(response.products) && response.products.length > 0
+              ? response.products[0]
+              : null;
+
+          const currentList = readGuestWishlist().filter(
+            (p) => String(typeof p === "string" ? p : p?._id) !== String(productId),
+          );
+
+          if (fetchedProduct) {
+            const updated = [...currentList, fetchedProduct];
+            writeGuestWishlist(updated);
+            setWishlist(commitWishlistSnapshot(updated));
+            dispatchWishlistUpdated();
+          } else {
+            const fallback: Product =
+              productData ||
+              ({
+                _id: productId,
+                name: "Product",
+                slug: "",
+                variants: [],
+              } as unknown as Product);
+            const updated = [...currentList, fallback];
+            writeGuestWishlist(updated);
+            setWishlist(commitWishlistSnapshot(updated));
+            dispatchWishlistUpdated();
+          }
+        } catch (fetchErr) {
+          console.error("Failed to fetch product for guest wishlist:", fetchErr);
+          const fallback: Product =
+            productData ||
+            ({
+              _id: productId,
+              name: "Product",
+              slug: "",
+              variants: [],
+            } as unknown as Product);
+          const currentList = readGuestWishlist().filter(
+            (p) => String(typeof p === "string" ? p : p?._id) !== String(productId),
+          );
+          const updated = [...currentList, fallback];
+          writeGuestWishlist(updated);
+          setWishlist(commitWishlistSnapshot(updated));
+          dispatchWishlistUpdated();
+        }
         return;
       }
 
       const isCurrentlyInWishlist = optimisticWishlistIds.has(productId);
 
-      // 1. Optimistically update set
+      // Optimistically update set
       setOptimisticWishlistIds((prev) => {
         const next = new Set(prev);
         if (isCurrentlyInWishlist) next.delete(productId);
@@ -131,12 +362,10 @@ export const useWishlist = (): UseWishlistReturn => {
       try {
         const response = await toggleWishlistApi(productId);
         if (response.success) {
-          // Sync with server state
           await loadWishlist(false);
           dispatchWishlistUpdated();
           toast.success(response.message || "Wishlist updated!");
         } else {
-          // Rollback on logic error
           setOptimisticWishlistIds((prev) => {
             const next = new Set(prev);
             if (isCurrentlyInWishlist) next.add(productId);
@@ -146,13 +375,11 @@ export const useWishlist = (): UseWishlistReturn => {
 
           if (isUnauthorized(response as ErrorLike)) {
             logout();
-            redirectToLogin(router);
             return;
           }
           toast.error(response.message || "Failed to update wishlist.");
         }
       } catch (err: unknown) {
-        // Rollback on network error
         setOptimisticWishlistIds((prev) => {
           const next = new Set(prev);
           if (isCurrentlyInWishlist) next.add(productId);
@@ -163,7 +390,6 @@ export const useWishlist = (): UseWishlistReturn => {
         const error = err as ErrorLike;
         if (isUnauthorized(error)) {
           logout();
-          redirectToLogin(router);
           return;
         }
         toast.error("Could not update wishlist. Please try again.");

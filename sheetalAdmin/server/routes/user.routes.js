@@ -12,6 +12,7 @@ import {
   getSingleUserDetails,
   toggleWishlist,
   getWishlist,
+  mergeGuestWishlist,
   addAddress,
   updateAddress,
   deleteAddress,
@@ -37,6 +38,7 @@ router.put(
 ); // Added multer middleware
 router.post("/wishlist", isAuthenticated, toggleWishlist);
 router.get("/wishlist", isAuthenticated, getWishlist);
+router.post("/wishlist/merge-guest", isAuthenticated, mergeGuestWishlist);
 
 // Address Routes
 router.post("/address", isAuthenticated, addAddress);

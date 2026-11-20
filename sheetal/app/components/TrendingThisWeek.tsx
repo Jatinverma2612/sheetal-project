@@ -40,7 +40,7 @@ function ProductCard({
 }: {
   product: TrendingProduct;
   isWishlisted: boolean;
-  onToggleWishlist: (productId: string) => void;
+  onToggleWishlist: (productId: string, product?: any) => void;
 }) {
   const href = buildProductHref({
     slug: product.id,
@@ -64,7 +64,16 @@ function ProductCard({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onToggleWishlist(product.productId);
+              onToggleWishlist(product.productId, {
+                _id: product.productId,
+                name: product.name,
+                slug: product.id,
+                image: product.image,
+                hoverImage: product.hoverImage,
+                price: product.price,
+                mrp: product.mrp,
+                mainImage: { url: product.image },
+              } as any);
             }}
             aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
