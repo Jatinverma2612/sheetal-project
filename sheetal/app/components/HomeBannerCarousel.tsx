@@ -58,7 +58,7 @@ const resolveBannerHref = (href?: string) => {
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-");
-    return categorySlug ? `/${encodeURIComponent(categorySlug)}` : "/product-list";
+    return categorySlug ? `/${encodeURIComponent(categorySlug)}` : "/";
   }
 
   const normalizedPath = trimmedHref.startsWith("/")
@@ -81,9 +81,9 @@ const resolveBannerHref = (href?: string) => {
       .join("/");
 
     const finalPath = `${sanitizedSegments || "/"}${queryString}`;
-    return finalPath || "/product-list";
+    return finalPath || "/";
   } catch {
-    return encodeURI(normalizedPath) || "/product-list";
+    return encodeURI(normalizedPath) || "/";
   }
 };
 

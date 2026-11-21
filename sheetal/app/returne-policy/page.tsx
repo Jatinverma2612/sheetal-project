@@ -1,9 +1,5 @@
-import PolicyPage, { getPolicyMetadata } from "../components/PolicyPage";
-
-export async function generateMetadata() {
-  return getPolicyMetadata("return-exchange-policy");
-}
+import { permanentRedirect } from "next/navigation";
 
 export default function LegacyReturnPolicyPage() {
-  return <PolicyPage slug="return-exchange-policy" />;
+  permanentRedirect("/return-exchange-policy");
 }

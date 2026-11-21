@@ -1,11 +1,13 @@
-import { Metadata } from "next";
-import Footer from "../components/Footer";
-import ProductListClient from "./ProductListClient";
-import { getPageData } from "../components/PolicyPage";
-import { getSeoSettings } from "../services/seoSettingsService";
+import { redirect } from "next/navigation";
+// import { Metadata } from "next";
+// import Footer from "../components/Footer";
+// import ProductListClient from "./ProductListClient";
+// import { getPageData } from "../components/PolicyPage";
+// import { getSeoSettings } from "../services/seoSettingsService";
 
 export const dynamic = "force-dynamic";
 
+/*
 export async function generateMetadata(): Promise<Metadata> {
   const [pageData, seoSettings] = await Promise.all([
     getPageData("product-list"),
@@ -50,14 +52,18 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
 }
+*/
 
 const ProductListPage = () => {
+  redirect("/");
+  /*
   return (
     <>
       <ProductListClient />
       <Footer />
     </>
   );
+  */
 };
 
 export default ProductListPage;

@@ -95,7 +95,7 @@ export const defaultTopInfoConfig: TopInfoConfig = {
   mode: "coupon",
   customText: "",
   customCtaLabel: "Shop Now",
-  customCtaHref: "/product-list",
+  customCtaHref: "/",
 };
 
 const defaultSections: HomepageSections = {

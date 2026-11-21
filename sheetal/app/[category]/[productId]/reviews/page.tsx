@@ -42,7 +42,7 @@ export default async function ProductReviewsPage({
   }
 
   if (!product) {
-    redirect("/product-list");
+    redirect("/");
   }
 
   if (redirectSlug && redirectSlug !== productId) {

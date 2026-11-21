@@ -27,7 +27,7 @@ const NewArrivals = ({ content }: { content?: NewArrivalsContent }) => {
     subheading: description = "Pick your beauty products today. 50% OFF on the new brands. Order all classy products today!",
     products: propProducts = [],
     buttonText = "Explore More",
-    buttonUrl = "/product-list?sort=newest",
+    buttonUrl = "/",
   } = content || {};
 
   const {

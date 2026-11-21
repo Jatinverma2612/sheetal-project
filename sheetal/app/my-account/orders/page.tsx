@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   getMyOrders,
   cancelOrder,
+  cancelOrderItem,
   requestOrderReturn,
 } from "../../services/orderService";
 import { addReview } from "../../services/productService";
@@ -410,8 +411,8 @@ const TrackModal = ({
   );
 };
 
-/** Cancel Order confirmation modal */
-const CancelModal = ({
+/** Cancel Entire Order confirmation modal */
+const CancelOrderModal = ({
   order,
   onClose,
   onSuccess,
@@ -437,14 +438,14 @@ const CancelModal = ({
   };
 
   return (
-    <ModalShell title="Cancel Order" onClose={onClose}>
+    <ModalShell title="Cancel Entire Order" onClose={onClose}>
       <p className="text-sm text-gray-600 mb-2">
-        Are you sure you want to cancel order{" "}
+        Are you sure you want to cancel the entire order{" "}
         <span className="font-semibold text-gray-900">#{order.orderId}</span>?
       </p>
       <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-        Your request will be registered. Our customer support team will contact
-        you shortly. Thank you for shopping with us.
+        All items in this order will be cancelled. Your request will be registered,
+        and our customer support team will contact you shortly if needed.
       </p>
       <div className="flex gap-3">
         <button
@@ -465,7 +466,96 @@ const CancelModal = ({
               Cancelling...
             </>
           ) : (
-            "Yes, Cancel"
+            "Yes, Cancel Order"
+          )}
+        </button>
+      </div>
+    </ModalShell>
+  );
+};
+
+/** Cancel Item confirmation modal */
+const CancelItemModal = ({
+  order,
+  item,
+  onClose,
+  onSuccess,
+}: {
+  order: UIOrder;
+  item: UIOrderItem;
+  onClose: () => void;
+  onSuccess: (orderId: string, itemId: string) => void;
+}) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirmCancel = async () => {
+    try {
+      setLoading(true);
+      await cancelOrderItem(order.id, item.id);
+      toast.success("Item cancelled successfully");
+      onSuccess(order.id, item.id);
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to cancel item");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Cancel Item" onClose={onClose}>
+      <div className="flex gap-3 mb-4 pb-3 border-b border-gray-100">
+        <div className="w-14 h-16 bg-[#fce4ec] rounded-lg overflow-hidden shrink-0 relative">
+          <Image
+            src={item.image}
+            alt={item.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                "/assets/images/product-placeholder.webp";
+            }}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2">
+            {item.name}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Color: {item.color} | Size: {item.size}
+          </p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Qty: {item.quantity} · ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+          </p>
+        </div>
+      </div>
+      <p className="text-sm text-gray-600 mb-2">
+        Are you sure you want to cancel this item from order{" "}
+        <span className="font-semibold text-gray-900">#{order.orderId}</span>?
+      </p>
+      <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+        Only this item will be cancelled. The remaining items in your order will not be affected and will be processed normally.
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={onClose}
+          disabled={loading}
+          className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+        >
+          Keep Item
+        </button>
+        <button
+          onClick={handleConfirmCancel}
+          disabled={loading}
+          className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Cancelling...
+            </>
+          ) : (
+            "Yes, Cancel Item"
           )}
         </button>
       </div>
@@ -773,7 +863,8 @@ const ReviewModal = ({
 interface OrderCardProps {
   order: UIOrder;
   onTrack: () => void;
-  onCancel: () => void;
+  onCancelEntireOrder: () => void;
+  onCancelItem: (item: UIOrderItem) => void;
   onReturn: (order: UIOrder, item: UIOrderItem) => void;
   onReview: (item: UIOrderItem) => void;
   onBuyAgain: (item: UIOrderItem) => void;
@@ -845,19 +936,40 @@ const DeliveryLine = ({ order, item }: { order: UIOrder; item: UIOrderItem }) =>
 const OrderCard = ({
   order,
   onTrack,
-  onCancel,
+  onCancelEntireOrder,
+  onCancelItem,
   onReturn,
   onReview,
   onBuyAgain,
-}: OrderCardProps) => (
-  <div className="border border-gray-400 bg-transparent mb-6 overflow-hidden rounded-md p-6">
-    {/* ── Order ID strip ── */}
-    <div className="flex justify-end items-center px-0 py-1.5 mb-1">
-      <p className="text-xs text-gray-500">
-        <span className="font-semibold text-gray-700">Order ID #</span>{" "}
-        {order.id}
-      </p>
-    </div>
+}: OrderCardProps) => {
+  const cancellableItems = order.items.filter((item) => {
+    const itemStatus: OrderStatus =
+      order.status === "Cancelled" ? "Cancelled" : item.status || order.status;
+    return itemStatus === "Processing" || itemStatus === "Shipped";
+  });
+  const canCancelEntireOrder =
+    order.status !== "Cancelled" &&
+    order.status !== "Delivered" &&
+    order.status !== "Returned" &&
+    cancellableItems.length > 0;
+
+  return (
+    <div className="border border-gray-400 bg-transparent mb-6 overflow-hidden rounded-md p-6">
+      {/* ── Order ID strip & Main Cancel Order button ── */}
+      <div className="flex flex-wrap justify-between items-center px-0 py-1.5 mb-2 gap-2">
+        <p className="text-xs text-gray-500">
+          <span className="font-semibold text-gray-700">Order ID #</span>{" "}
+          {order.id}
+        </p>
+        {canCancelEntireOrder && (
+          <button
+            onClick={onCancelEntireOrder}
+            className="text-xs font-semibold text-red-600 hover:text-white hover:bg-red-600 border border-red-300 hover:border-red-600 rounded px-2.5 py-1 transition cursor-pointer"
+          >
+            {order.items.length > 1 ? "Cancel Entire Order" : "Cancel Order"}
+          </button>
+        )}
+      </div>
 
     {/* ── Per-item blocks ── */}
     {order.items.map((item, idx) => {
@@ -956,8 +1068,8 @@ const OrderCard = ({
             {(itemEffectiveStatus === "Processing" || itemEffectiveStatus === "Shipped") && (
               <div className="flex items-center gap-3 px-3 pb-3">
                 <button
-                  onClick={onCancel}
-                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  onClick={() => onCancelItem(item)}
+                  className="flex-1 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1005,7 +1117,8 @@ const OrderCard = ({
       );
     })}
   </div>
-);
+  );
+};
 
 const OrderSkeleton = () => (
   <div className="border border-gray-200 rounded-xl bg-white mb-4 overflow-hidden animate-pulse">
@@ -1043,7 +1156,11 @@ const OrdersPage = () => {
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [trackOrder, setTrackOrder] = useState<UIOrder | null>(null);
-  const [cancelOrder, setCancelOrder] = useState<UIOrder | null>(null);
+  const [cancelEntireOrderTarget, setCancelEntireOrderTarget] = useState<UIOrder | null>(null);
+  const [cancelItemTarget, setCancelItemTarget] = useState<{
+    order: UIOrder;
+    item: UIOrderItem;
+  } | null>(null);
   const [returnTarget, setReturnTarget] = useState<{
     order: UIOrder;
     item: UIOrderItem;
@@ -1248,7 +1365,7 @@ const OrdersPage = () => {
                 : "Try adjusting your search or filter"}
             </p>
             <Link
-              href="/product-list"
+              href="/"
               className="mt-5 px-6 py-2.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-black transition font-medium"
             >
               Start Shopping
@@ -1264,7 +1381,10 @@ const OrdersPage = () => {
                 key={order.id}
                 order={order}
                 onTrack={() => setTrackOrder(order)}
-                onCancel={() => setCancelOrder(order)}
+                onCancelEntireOrder={() => setCancelEntireOrderTarget(order)}
+                onCancelItem={(item) =>
+                  setCancelItemTarget({ order, item })
+                }
                 onReturn={(ord, itm) =>
                   setReturnTarget({ order: ord, item: itm })
                 }
@@ -1312,15 +1432,54 @@ const OrdersPage = () => {
       {trackOrder && (
         <TrackModal order={trackOrder} onClose={() => setTrackOrder(null)} />
       )}
-      {cancelOrder && (
-        <CancelModal
-          order={cancelOrder}
-          onClose={() => setCancelOrder(null)}
+      {cancelEntireOrderTarget && (
+        <CancelOrderModal
+          order={cancelEntireOrderTarget}
+          onClose={() => setCancelEntireOrderTarget(null)}
           onSuccess={(cancelledId) => {
             setOrders((prev) =>
               prev.map((ord) =>
-                ord.id === cancelledId ? { ...ord, status: "Cancelled" } : ord
+                ord.id === cancelledId
+                  ? {
+                      ...ord,
+                      status: "Cancelled",
+                      items: ord.items.map((it) => ({
+                        ...it,
+                        status: "Cancelled",
+                      })),
+                    }
+                  : ord
               )
+            );
+            fetchOrders(currentPage, statusFilter);
+          }}
+        />
+      )}
+      {cancelItemTarget && (
+        <CancelItemModal
+          order={cancelItemTarget.order}
+          item={cancelItemTarget.item}
+          onClose={() => setCancelItemTarget(null)}
+          onSuccess={(orderId, itemId) => {
+            setOrders((prev) =>
+              prev.map((ord) => {
+                if (ord.id !== orderId) return ord;
+                const updatedItems = ord.items.map((it) =>
+                  it.id === itemId
+                    ? { ...it, status: "Cancelled" as OrderStatus }
+                    : it
+                );
+                const hasRemainingActive = updatedItems.some(
+                  (it) => it.status !== "Cancelled"
+                );
+                return {
+                  ...ord,
+                  status: hasRemainingActive
+                    ? ord.status
+                    : ("Cancelled" as OrderStatus),
+                  items: updatedItems,
+                };
+              })
             );
             fetchOrders(currentPage, statusFilter);
           }}

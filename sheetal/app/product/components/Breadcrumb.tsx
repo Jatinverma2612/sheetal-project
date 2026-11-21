@@ -23,11 +23,7 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
         </li>
         <li>
           <Link
-            href={
-              categorySlug
-                ? `/product-list?category=${categorySlug}`
-                : "/product-list"
-            }
+            href={categorySlug ? `/${categorySlug}` : "/"}
             className="text-[#6a3f07] text-[15px]"
           >
             {categoryName || "Products"}

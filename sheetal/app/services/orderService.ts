@@ -93,6 +93,23 @@ export const cancelOrder = async (orderId: string, reason?: string) => {
 };
 
 /**
+ * Cancels a single item in an order belonging to the currently authenticated user.
+ * @param orderId - MongoDB _id of the order
+ * @param itemId  - MongoDB _id of the item inside orderItems
+ * @param reason  - Optional cancellation reason
+ */
+export const cancelOrderItem = async (
+  orderId: string,
+  itemId: string,
+  reason?: string,
+) => {
+  return apiFetch(`/orders/${orderId}/items/${itemId}/cancel`, {
+    method: "PUT",
+    body: JSON.stringify({ reason }),
+  });
+};
+
+/**
  * Submits a return or exchange request for an item in a delivered order.
  * @param params - { orderId, productId, type, reason, details }
  */

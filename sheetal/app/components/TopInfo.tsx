@@ -43,7 +43,7 @@ const getCouponHref = (coupon: HomepageCoupon | null) => {
   if (coupon?.scope === "Category" && applicableSlug) {
     return `/${applicableSlug}`;
   }
-  return "/product-list";
+  return "/";
 };
 
 async function getTopInfoData() {
@@ -102,7 +102,7 @@ const buildTopInfoContent = (topInfoData: Awaited<ReturnType<typeof getTopInfoDa
       code: null,
       href:
         homepageSettings?.topInfoConfig?.customCtaHref?.trim() ||
-        "/product-list",
+        "/",
       ctaLabel:
         homepageSettings?.topInfoConfig?.customCtaLabel?.trim() ||
         "Shop Now",
@@ -121,7 +121,7 @@ const buildTopInfoContent = (topInfoData: Awaited<ReturnType<typeof getTopInfoDa
   return {
     text: displayText,
     code: validCoupon?.couponType === "CouponCode" ? validCoupon.code : null,
-    href: validCoupon ? getCouponHref(validCoupon) : "/product-list",
+    href: validCoupon ? getCouponHref(validCoupon) : "/",
     ctaLabel: "Shop Now",
   };
 };

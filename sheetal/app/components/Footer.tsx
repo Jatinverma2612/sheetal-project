@@ -14,6 +14,7 @@ const normalizeFooterHref = (href: string): string => {
   const trimmed = href.trim();
   const map: Record<string, string> = {
     "/sitemap": "/sitemap",
+    "/shop": "/sitemap",
     "/track-order": "/my-account/orders",
     "/return-order": "/my-account/orders",
     "/our-story": "/about-us#our-story",
@@ -60,7 +61,7 @@ const defaultLayout: FooterBlock[] = [
           { id: "5", label: "My Account", href: "/my-account" },
           { id: "6", label: "Track Order", href: "/my-account/orders" },
           { id: "7", label: "Return Order", href: "/my-account/orders" },
-          { id: "8", label: "Sitemap", href: "/shop" },
+          { id: "8", label: "Sitemap", href: "/sitemap" },
         ],
       },
     ],

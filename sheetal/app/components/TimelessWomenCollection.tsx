@@ -209,15 +209,11 @@ function getLookbookHref(
     categoryLinks?.filter((slug) => Boolean(slug?.trim())) || [];
 
   if (selectedCategories.length > 0) {
-    const params = new URLSearchParams({
-      fromLookbook: "true",
-      categories: selectedCategories.join(","),
-    });
-    return `/product-list?${params.toString()}`;
+    return `/${selectedCategories[0]}?fromLookbook=true`;
   }
 
   if (fallbackLink?.startsWith("/product-list")) {
-    return fallbackLink;
+    return "/";
   }
 
   if (categoryLink) {

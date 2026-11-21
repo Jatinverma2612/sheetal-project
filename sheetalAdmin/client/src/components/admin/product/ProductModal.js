@@ -489,9 +489,17 @@ export default function ProductModal({
           toast.error("Please provide a size name for all variant sizes.");
           return;
         }
-        if (s.price === undefined || s.price === null || s.price === "" || Number(s.price) < 0) {
+        if (
+          s.price === undefined ||
+          s.price === null ||
+          s.price === "" ||
+          Number(s.price) <= 0 ||
+          isNaN(Number(s.price))
+        ) {
           setActiveTab("inventory");
-          toast.error(`Please enter a valid price for size "${s.name}".`);
+          toast.error(
+            `Please enter a valid price greater than 0 for size "${s.name}".`,
+          );
           return;
         }
         const normalizedSize = canonicalizeSizeName(s.name);

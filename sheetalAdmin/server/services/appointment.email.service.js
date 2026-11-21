@@ -2,6 +2,29 @@ import sendEmail from "../utils/sendEmail.js";
 import Settings from "../models/settings.model.js";
 import logger from "../utils/logger.js";
 
+const formatTime12h = (timeStr) => {
+  if (!timeStr) return "To be scheduled";
+  const [hours, minutes] = timeStr.split(":");
+  if (hours === undefined || minutes === undefined) return timeStr;
+  const h = parseInt(hours, 10);
+  const m = parseInt(minutes, 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  const mStr = m < 10 ? `0${m}` : m;
+  return `${h12}:${mStr} ${ampm}`;
+};
+
+const formatDateSafe = (dateVal, fallback = "To be scheduled by our team") => {
+  if (!dateVal) return fallback;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return fallback;
+  return d.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+  });
+};
+
 export const sendAppointmentConfirmationEmail = async (appointment) => {
   try {
     const settings = await Settings.findOne();
@@ -24,14 +47,14 @@ export const sendAppointmentConfirmationEmail = async (appointment) => {
     }
 
     const replacements = {
-      "{{id}}": appointment._id.toString().slice(-6).toUpperCase(),
-      "{{name}}": appointment.name,
-      "{{date}}": new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
-      "{{time}}": appointment.appointmentTime,
-      "{{address}}": appointment.address,
-      "{{city}}": appointment.city,
-      "{{pincode}}": appointment.pincode,
-      "{{contact}}": appointment.contact,
+      "{{id}}": appointment._id ? appointment._id.toString().slice(-6).toUpperCase() : "",
+      "{{name}}": appointment.name || "Customer",
+      "{{date}}": formatDateSafe(appointment.appointmentDate, "Confirmed Date"),
+      "{{time}}": formatTime12h(appointment.appointmentTime),
+      "{{address}}": appointment.address || "",
+      "{{city}}": appointment.city || "",
+      "{{pincode}}": appointment.pincode || "",
+      "{{contact}}": appointment.contact || "",
       "{{requirements}}": appointment.requirements || "None",
       "{{bannerMarkup}}": bannerMarkup,
       "{{year}}": new Date().getFullYear(),
@@ -62,10 +85,13 @@ export const sendAppointmentPendingEmail = async (appointment) => {
       ? `<img src="${bannerUrl}" alt="Studio By Sheetal" width="600" style="height:auto;display:block;border:0;">`
       : `<p style="margin:0;font-size:18px;font-weight:700;color:#111827;">Studio By Sheetal</p>`;
 
-    const formattedDate = appointment.appointmentDate
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
-      : "To be scheduled by our team";
-    const formattedTime = appointment.appointmentTime || "To be scheduled";
+    const formattedDate = formatDateSafe(
+      appointment.appointmentDate,
+      "To be scheduled by our team"
+    );
+    const formattedTime = appointment.appointmentTime
+      ? formatTime12h(appointment.appointmentTime)
+      : "To be scheduled";
     const shortId = appointment._id
       ? appointment._id.toString().slice(-6).toUpperCase()
       : "";
@@ -166,10 +192,13 @@ export const sendAppointmentCancelledEmail = async (appointment) => {
       ? `<img src="${bannerUrl}" alt="Studio By Sheetal" width="600" style="height:auto;display:block;border:0;">`
       : `<p style="margin:0;font-size:18px;font-weight:700;color:#111827;">Studio By Sheetal</p>`;
 
-    const formattedDate = appointment.appointmentDate
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
+    const formattedDate = formatDateSafe(
+      appointment.appointmentDate,
+      "N/A"
+    );
+    const formattedTime = appointment.appointmentTime
+      ? formatTime12h(appointment.appointmentTime)
       : "N/A";
-    const formattedTime = appointment.appointmentTime || "N/A";
     const shortId = appointment._id
       ? appointment._id.toString().slice(-6).toUpperCase()
       : "";

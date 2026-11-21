@@ -61,8 +61,7 @@ const addSearchQuery = (queryText: string) => {
   addClickedItem({ type: "query", name: trimmed });
 };
 
-const getSearchResultsHref = (queryText: string) =>
-  `/product-list?search=${encodeURIComponent(queryText.trim())}`;
+const getSearchResultsHref = (_queryText?: string) => "/";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -463,7 +462,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
                             slug: item.slug,
                             categorySlug: item.categorySlug,
                           })
-                        : `/product-list?category=${encodeURIComponent(item.categoryName || "")}`
+                        : item.categorySlug
+                          ? `/${item.categorySlug}`
+                          : "/"
                     }
                     onClick={() => {
                       addClickedItem(item);
@@ -514,7 +515,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
             className="relative aspect-[3/4] rounded-lg overflow-hidden group"
           >
             <Link
-              href={`/product-list?category=${cat.slug}`}
+              href={`/${cat.slug}`}
               className="block h-full w-full"
               onClick={() => {
                 addClickedItem({
@@ -533,7 +534,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
               />
             </Link>
             <Link
-              href={`/product-list?category=${cat.slug}`}
+              href={`/${cat.slug}`}
               className="absolute bottom-0 left-0 w-full text-center text-white text-[16px] bg-gradient-to-t from-[#251d05] to-transparent pt-[60px] pb-[15px] transition-all duration-300 pointer-events-auto"
               onClick={() => {
                 addClickedItem({
@@ -554,7 +555,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       <div className="mt-8 flex justify-center">
         <Link
-          href="/product-list"
+          href="/"
           onClick={onClose}
           className="inline-block border border-black text-black px-6 py-2.5 text-[12px] uppercase tracking-[0.15em] font-medium transition-colors duration-300 rounded-[2px]"
         >

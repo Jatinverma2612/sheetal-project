@@ -51,7 +51,6 @@ const FAQPage = async () => {
   if (!data) {
     return <div className="p-20 text-center">Loading...</div>;
   }
-  console.log(data);
 
   const schema =
     parseSchemaString(data?.seoSchema) || buildFaqSchema(data, seoSettings);

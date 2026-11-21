@@ -690,7 +690,9 @@ export default function AppointmentsPage() {
       toast.success(
         status === "confirmed"
           ? "Appointment confirmed and email sent"
-          : "Status updated",
+          : status === "cancelled"
+            ? "Appointment cancelled and notification sent"
+            : "Status updated",
       );
       setShowConfirmModal(false);
       fetchAppointmentsList();

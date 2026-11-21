@@ -307,15 +307,17 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
               // Size has stock in at least one variant of the product
               const hasStockAcrossVariants = Boolean(size.available);
 
-              // Truly disabled / sold out only if 0 stock across all variants
-              const isSoldOut = !hasStockAcrossVariants;
-              const isDisabled = !hasStockAcrossVariants;
+              // Determine whether the size is out of stock for the current variant
+              const isSizeOutOfStock =
+                actualStock !== undefined
+                  ? actualStock <= 0
+                  : !hasStockAcrossVariants;
+              const isSelected = selectedSize === size.name;
 
               return (
                 <div key={size.name} className="flex flex-col items-center">
                   <button
                     type="button"
-                    disabled={isDisabled}
                     onClick={() => setSelectedSize(size.name)}
                     className={`
                       ${
@@ -323,20 +325,21 @@ const ProductInfo: React.FC<ProductInfoProps> = ({
                           ? "px-3 py-2 rounded-md"
                           : "w-9 h-9 md:w-10 md:h-10 rounded-full"
                       }
-                      flex items-center justify-center border text-xs md:text-sm font-medium transition-colors relative
-                      ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""}
+                      flex items-center justify-center border text-xs md:text-sm font-medium transition-colors relative cursor-pointer
                       ${
-                        selectedSize === size.name && !isDisabled
-                          ? "border-[#bd9951] text-[#bd9951]"
-                          : "border-gray-300 text-gray-700 hover:border-[#bd9951] cursor-pointer"
+                        isSelected
+                          ? "border-[#bd9951] text-[#bd9951] font-semibold ring-1 ring-[#bd9951]"
+                          : isSizeOutOfStock
+                            ? "border-gray-200 text-gray-400 bg-gray-50 hover:border-gray-400"
+                            : "border-gray-300 text-gray-700 hover:border-[#bd9951]"
                       }
                     `}
                   >
                     {size.name}
-                    {(isDisabled || isSoldOut) && (
+                    {isSizeOutOfStock && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div
-                          className={`w-full h-px bg-gray-400 transform ${size.name === "One Size" || size.name === "Free Size" ? "rotate-25" : "rotate-45"}`}
+                          className={`w-full h-px ${isSelected ? "bg-[#bd9951]" : "bg-gray-400"} transform ${size.name === "One Size" || size.name === "Free Size" ? "rotate-25" : "rotate-45"}`}
                         />
                       </div>
                     )}

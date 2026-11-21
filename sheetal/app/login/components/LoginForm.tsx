@@ -168,14 +168,14 @@ const LoginForm = ({
         ? applicableItem.slug || null
         : null;
 
-    if (!loginCoupon || isHidden) return "/product-list";
+    if (!loginCoupon || isHidden) return "/";
     if (loginCoupon.scope === "Specific_Product" && applicableSlug) {
       return `/product/${applicableSlug}`;
     }
     if (loginCoupon.scope === "Category" && applicableSlug) {
       return `/${applicableSlug}`;
     }
-    return "/product-list";
+    return "/";
   })();
 
   const setupRecaptcha = async () => {

@@ -4,6 +4,7 @@ import {
   sendAppointmentPendingEmail,
   sendAppointmentCancelledEmail,
 } from "../services/appointment.email.service.js";
+import logger from "../utils/logger.js";
 
 // @desc    Book an appointment
 // @route   POST /api/v1/appointments
@@ -58,6 +59,10 @@ export const createAppointment = async (req, res, next) => {
       city: city.trim(),
       pincode: trimmedPincode,
       requirements: requirements?.trim() || "",
+    });
+
+    sendAppointmentPendingEmail(appointment).catch((err) => {
+      logger.error("Error sending appointment pending email:", err);
     });
 
     res.status(201).json({ success: true, appointment });
@@ -183,6 +188,14 @@ export const updateStatus = async (req, res, next) => {
         return res.status(500).json({
           success: false,
           message: `Email delivery failed: ${emailResult.error}. Appointment confirmation aborted.`,
+        });
+      }
+    } else if (status === "cancelled") {
+      const emailResult = await sendAppointmentCancelledEmail(appointmentDoc);
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          message: `Email delivery failed: ${emailResult.error}. Appointment cancellation aborted.`,
         });
       }
     }

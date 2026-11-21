@@ -330,3 +330,83 @@ export const cancelOrder = async (req, res, next) => {
     next(error);
   }
 };
+
+export const cancelOrderItem = async (req, res, next) => {
+  try {
+    const { id: orderId, itemId } = req.params;
+    const userId = req.user._id;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    if (
+      order.user.toString() !== userId.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to cancel this order item",
+        });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Order is already cancelled" });
+    }
+
+    if (order.orderStatus === "Delivered" || order.orderStatus === "Returned") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel an item for an order that is already ${order.orderStatus.toLowerCase()}`,
+      });
+    }
+
+    const orderItem =
+      (order.orderItems.id && order.orderItems.id(itemId)) ||
+      order.orderItems.find((it) => it._id?.toString() === itemId.toString());
+
+    if (!orderItem) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order item not found" });
+    }
+
+    if (orderItem.itemStatus === "Cancelled") {
+      return res
+        .status(400)
+        .json({ success: false, message: "This item is already cancelled" });
+    }
+
+    if (
+      orderItem.itemStatus === "Delivered" ||
+      orderItem.itemStatus === "Returned"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel an item that is already ${orderItem.itemStatus.toLowerCase()}`,
+      });
+    }
+
+    const updatedOrder = await orderService.updateOrderItemStatusService(
+      orderId,
+      itemId,
+      "Cancelled",
+    );
+
+    return successResponse(
+      res,
+      200,
+      updatedOrder,
+      "Order item cancelled successfully",
+    );
+  } catch (error) {
+    next(error);
+  }
+};

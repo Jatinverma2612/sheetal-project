@@ -936,7 +936,7 @@ const OrderDetailPage = () => {
 
             {/* ── Shop more — full-width bordered button ── */}
             <Link
-                href="/product-list"
+                href="/"
                 className="w-full block text-center py-3 border border-[#a97f0f] text-[#a97f0f] text-sm font-semibold hover:bg-[#fdf6e8] transition-colors mt-1 mb-4"
             >
                 Shop more from SBS →

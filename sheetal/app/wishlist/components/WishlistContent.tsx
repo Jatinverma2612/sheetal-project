@@ -170,7 +170,7 @@ const WishlistContent = () => {
           Looks like you haven't added anything to your wishlist yet.
         </p>
         <Link
-          href="/product-list"
+          href="/"
           className="inline-block bg-[#6b4a1f] text-white py-3 px-8 text-md tracking-wide hover:bg-opacity-90 transition cursor-pointer"
         >
           Continue Shopping

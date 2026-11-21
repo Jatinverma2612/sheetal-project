@@ -3,6 +3,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import ProductCard from "./ProductCard";
 import Image from "next/image";
 import { fetchProducts } from "../../services/productService";
+import { getProductDisplayPrice } from "../../utils/productPricing";
 
 const RV_KEY = "__rv__";
 
@@ -145,20 +146,52 @@ const RelatedProducts: React.FC<RelatedProductsProps> = ({
         if (cancelled) return;
 
         if (res.success && Array.isArray(res.products)) {
-          const activeIds = new Set(res.products.map((p) => p._id));
-
-          // 5. Keep only entries that are still active, preserving original order
-          const active = candidates.filter(
-            (p) => !p.productId || activeIds.has(p.productId),
+          const productMap = new Map(
+            res.products.map((p: any) => [String(p._id), p]),
           );
 
-          // 6. Write the cleaned list back to localStorage (prune deleted products)
-          const fullList = parsed.filter(
-            (p) =>
-              p.id === currentSlug || // keep current (it will be filtered on next visit)
-              !p.productId ||
-              activeIds.has(p.productId),
-          );
+          // 5. Keep only entries that are still active and re-hydrate with live price & data
+          const active: RelatedProductItem[] = [];
+          for (const cand of candidates) {
+            if (!cand.productId) {
+              active.push(cand);
+              continue;
+            }
+            const liveProd = productMap.get(String(cand.productId));
+            if (liveProd) {
+              const priceInfo = getProductDisplayPrice(liveProd);
+              active.push({
+                ...cand,
+                name: liveProd.name || cand.name,
+                price: priceInfo.price,
+                mrp: priceInfo.mrp,
+                discount: priceInfo.discount,
+                soldOut: Number(liveProd.stock) <= 0,
+                rating: liveProd.averageRating ?? cand.rating ?? 0,
+              });
+            }
+          }
+
+          // 6. Write the cleaned & re-hydrated list back to localStorage
+          const fullList = parsed
+            .filter((p) => p.id === currentSlug || !p.productId || productMap.has(String(p.productId)))
+            .map((p) => {
+              if (p.productId && productMap.has(String(p.productId))) {
+                const liveProd = productMap.get(String(p.productId));
+                const priceInfo = getProductDisplayPrice(liveProd);
+                return {
+                  ...p,
+                  name: liveProd.name || p.name,
+                  price: priceInfo.price,
+                  mrp: priceInfo.mrp,
+                  discount: priceInfo.discount,
+                  soldOut: Number(liveProd.stock) <= 0,
+                  rating: liveProd.averageRating ?? p.rating ?? 0,
+                };
+              }
+              return p;
+            });
+
           try {
             localStorage.setItem(RV_KEY, JSON.stringify(fullList));
           } catch {

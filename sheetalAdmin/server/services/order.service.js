@@ -557,7 +557,12 @@ export const updateOrderStatusService = async (
 
   if (status === "Cancelled" || status === "Returned") {
     if (order.inventoryAdjusted) {
-      await revertOrderInventoryAdjustments(order.orderItems);
+      const itemsToRevert = order.orderItems.filter(
+        (item) => item.inventoryAdjusted !== false,
+      );
+      if (itemsToRevert.length > 0) {
+        await revertOrderInventoryAdjustments(itemsToRevert);
+      }
       order.inventoryAdjusted = false;
       order.orderItems.forEach((item) => {
         item.inventoryAdjusted = false;
@@ -627,7 +632,11 @@ export const updateOrderItemStatusService = async (
   const order = await Order.findById(orderId);
   if (!order) throw ErrorResponse("Order nahi mila", 404);
 
-  const orderItem = order.orderItems.id(orderItemId);
+  const orderItem =
+    (order.orderItems.id && order.orderItems.id(orderItemId)) ||
+    order.orderItems.find(
+      (it) => it._id?.toString() === orderItemId.toString(),
+    );
   if (!orderItem) throw ErrorResponse("Order item nahi mila", 404);
 
   if (!VALID_ITEM_STATUSES.has(status)) {

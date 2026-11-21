@@ -123,7 +123,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   if (!product) {
-    redirect("/product-list");
+    redirect("/");
   }
 
   if (redirectSlug && redirectSlug !== productId) {

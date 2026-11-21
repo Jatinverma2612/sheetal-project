@@ -40,7 +40,7 @@ export const buildProductHref = (
   options?: { scroll?: string },
 ): string => {
   const slug = getProductSlug(product);
-  if (!slug) return "/product-list";
+  if (!slug) return "/";
 
   const categorySlug = getProductCategorySlug(product);
   const pathname = categorySlug
@@ -59,7 +59,7 @@ export const buildProductReviewsHref = (
   product: ProductLike | null | undefined,
 ): string => {
   const productHref = buildProductHref(product);
-  if (productHref === "/product-list") {
+  if (productHref === "/") {
     return productHref;
   }
 

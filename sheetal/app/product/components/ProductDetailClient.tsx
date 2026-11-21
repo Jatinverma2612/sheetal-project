@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import WishlistLoginModal from "../../components/WishlistLoginModal";
 import StorefrontLoadingShell from "../../components/StorefrontLoadingShell";
@@ -43,6 +44,7 @@ import toast from "react-hot-toast";
 import useSWR from "swr";
 import { getSettings, getEnquiryImageUrl } from "../../services/settingsService";
 import { canonicalizeSizeName } from "../../utils/sizeUtils";
+import { getProductDisplayPrice } from "../../utils/productPricing";
 
 const DEFAULT_FALLBACK_SIZE_CHART: SizeChartData = {
   _id: "default-fallback-size-chart",
@@ -232,10 +234,12 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
               matchedVariant.sizes.find(
                 (s: ProductVariant["sizes"][number]) => s.stock > 0,
               ) || null;
+            const fallbackSize =
+              nextAvailableSize || matchedVariant.sizes?.[0] || null;
             setSelectedSize(
-              nextAvailableSize ? canonicalizeSizeName(nextAvailableSize.name) : "",
+              fallbackSize ? canonicalizeSizeName(fallbackSize.name) : "",
             );
-            setSelectedSizeObject(nextAvailableSize);
+            setSelectedSizeObject(fallbackSize);
           }
         } else {
           const firstAvailableVariant = res.data.variants?.find(
@@ -263,15 +267,35 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
                 discountPrice: number;
               }) => s.stock > 0,
             );
-            if (firstAvailableSize) {
-              setSelectedSize(canonicalizeSizeName(firstAvailableSize.name));
-              setSelectedSizeObject(firstAvailableSize);
+            const resolvedSize =
+              firstAvailableSize || firstAvailableVariant.sizes?.[0] || null;
+            if (resolvedSize) {
+              setSelectedSize(canonicalizeSizeName(resolvedSize.name));
+              setSelectedSizeObject(resolvedSize);
             }
           } else {
-            setSelectedImage(getProductImageUrl(res.data));
-            setSelectedVariantData(null);
-            setSelectedSize("");
-            setSelectedSizeObject(null);
+            const firstVar = res.data.variants?.[0] || null;
+            if (firstVar) {
+              setSelectedVariantData(firstVar);
+              if (firstVar.color?.name) {
+                setSelectedColor(firstVar.color.name);
+              }
+              const initialGallery = getVariantGalleryUrls(res.data, firstVar);
+              setSelectedImage(initialGallery[0] || getProductImageUrl(res.data));
+              const firstSize = firstVar.sizes?.[0] || null;
+              if (firstSize) {
+                setSelectedSize(canonicalizeSizeName(firstSize.name));
+                setSelectedSizeObject(firstSize);
+              } else {
+                setSelectedSize("");
+                setSelectedSizeObject(null);
+              }
+            } else {
+              setSelectedImage(getProductImageUrl(res.data));
+              setSelectedVariantData(null);
+              setSelectedSize("");
+              setSelectedSizeObject(null);
+            }
           }
         }
 
@@ -461,27 +485,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
         // ── Recently viewed ────────────────────────────────────────────
         try {
           const RV_KEY = "__rv__";
-          let minPrice = Infinity;
-          let minMRP = Infinity;
-
-          res.data.variants?.forEach((v: ProductVariant) => {
-            v.sizes?.forEach((s: { price: number; discountPrice: number }) => {
-              if (sizeHasDiscount(s)) {
-                if (s.price < minMRP) minMRP = s.price;
-                if (s.discountPrice < minPrice) minPrice = s.discountPrice;
-              } else {
-                if (s.price > 0 && s.price < minPrice) minPrice = s.price;
-              }
-            });
-          });
-
-          if (minPrice === Infinity) minPrice = 0;
-          if (minMRP === Infinity) minMRP = 0;
-
-          const currentDiscount =
-            minMRP > 0 && minPrice < minMRP
-              ? `${Math.round(((minMRP - minPrice) / minMRP) * 100)}%`
-              : "0%";
+          const priceInfo = getProductDisplayPrice(res.data);
 
           const entry = {
             id: res.data.slug,
@@ -491,9 +495,9 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
             hoverImage: res.data.hoverImage?.url
               ? getApiImageUrl(res.data.hoverImage.url)
               : getProductImageUrl(res.data),
-            price: minPrice,
-            mrp: minMRP,
-            discount: currentDiscount,
+            price: priceInfo.price,
+            mrp: priceInfo.mrp,
+            discount: priceInfo.discount,
             soldOut: res.data.stock <= 0,
             rating: res.data.averageRating || 0,
           };
@@ -729,8 +733,24 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
   }, [galleryImages, selectedImage]);
 
   if (loading) return <StorefrontLoadingShell message="Loading product..." />;
-  if (!product)
-    return <StorefrontLoadingShell message={error || "Product not found"} />;
+  if (!product) {
+    return (
+      <main className="flex min-h-[50vh] flex-col items-center justify-center px-4 py-16 text-center font-[family-name:var(--font-montserrat)] bg-white">
+        <h1 className="text-3xl sm:text-4xl font-normal text-[#6a3f0e] font-[family-name:var(--font-optima)] mb-3">
+          Product Not Available
+        </h1>
+        <p className="text-gray-500 max-w-md mb-8 text-sm sm:text-base leading-relaxed">
+          The product you are looking for is currently unavailable or has been moved.
+        </p>
+        <Link
+          href="/"
+          className="inline-block rounded border border-[#bd9951] bg-[#bd9951] px-8 py-3 text-xs sm:text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-[#a38547]"
+        >
+          Explore Collections
+        </Link>
+      </main>
+    );
+  }
 
   // ── Derive colors, sizes, colorToSizes map ────────────────────────────────
   const allUniqueColors: ColorOption[] = [];
@@ -963,28 +983,7 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
 
   const relatedProductsData: RelatedProduct[] = similarProducts
     .map((p: Product, idx: number) => {
-      let minPrice = Infinity;
-      let minMRP = Infinity;
-
-      (p.variants ?? []).forEach((variant) => {
-        (variant.sizes ?? []).forEach((size) => {
-          if (sizeHasDiscount(size)) {
-            if (size.price < minMRP) minMRP = size.price;
-            if (size.discountPrice < minPrice) minPrice = size.discountPrice;
-          } else {
-            if (size.price > 0 && size.price < minPrice) minPrice = size.price;
-          }
-        });
-      });
-
-      if (minPrice === Infinity) minPrice = 0;
-      if (minMRP === Infinity) minMRP = 0;
-
-      const currentDiscount =
-        minMRP > 0 && minPrice < minMRP
-          ? `${Math.round(((minMRP - minPrice) / minMRP) * 100)}%`
-          : "0%";
-
+      const priceInfo = getProductDisplayPrice(p);
       const isAdminPick = adminPickedIds.has(String(p._id));
 
       return {
@@ -995,9 +994,9 @@ const ProductDetailClient = ({ slug }: { slug: string }) => {
         hoverImage: p.hoverImage?.url
           ? getApiImageUrl(p.hoverImage.url)
           : getProductImageUrl(p),
-        price: minPrice,
-        mrp: minMRP,
-        discount: currentDiscount,
+        price: priceInfo.price,
+        mrp: priceInfo.mrp,
+        discount: priceInfo.discount,
         soldOut: p.stock <= 0,
         rating: p.averageRating || 0,
         _isAdminPick: isAdminPick,

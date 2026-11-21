@@ -113,7 +113,7 @@ const ProductCard = ({
           </div>
 
           <div className="flex items-center gap-2 text-sm">
-            {product.mrp !== undefined && product.price !== undefined && Number(product.mrp) !== Number(product.price) ? (
+            {Number(product.price) > 0 && Number(product.mrp) > Number(product.price) ? (
               <>
                 <span className="font-normal text-[16px] text-[#281b00]">
                   ₹{" "}
@@ -133,14 +133,20 @@ const ProductCard = ({
                   </span>
                 )}
               </>
-            ) : (
+            ) : Number(product.price) > 0 || Number(product.mrp) > 0 ? (
               <span className="font-normal text-[16px] text-[#281b00]">
                 ₹{" "}
-                {typeof product.mrp === "number"
-                  ? product.mrp.toFixed(2)
-                  : typeof product.price === "number"
-                  ? product.price.toFixed(2)
-                  : (product.mrp || product.price)}
+                {Number(product.price) > 0
+                  ? typeof product.price === "number"
+                    ? product.price.toFixed(2)
+                    : product.price
+                  : typeof product.mrp === "number"
+                    ? product.mrp.toFixed(2)
+                    : product.mrp}
+              </span>
+            ) : (
+              <span className="font-normal text-[16px] text-[#683e14]">
+                Price on Request
               </span>
             )}
           </div>

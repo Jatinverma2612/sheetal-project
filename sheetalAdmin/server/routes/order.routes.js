@@ -4,6 +4,7 @@ import {
   getMyOrders,
   getSingleOrder,
   cancelOrder,
+  cancelOrderItem,
   adminGetSingleOrder,
   adminGetAllOrders,
   adminGetOrderStats,
@@ -28,6 +29,9 @@ router.get("/:id", isAuthenticated, getSingleOrder);
 
 // 4. User: Cancel order
 router.put("/:id/cancel", isAuthenticated, cancelOrder);
+
+// 5. User: Cancel single item in order
+router.put("/:id/items/:itemId/cancel", isAuthenticated, cancelOrderItem);
 
 // --- ADMIN ROUTES ---
 // Admin: Server-side order stats (replaces client-side 1000-order fetch)
